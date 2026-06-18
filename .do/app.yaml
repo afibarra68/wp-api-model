@@ -67,7 +67,7 @@ services:
 
       # CORS — URL de tu frontend
       - key: CORS_ORIGINS
-        value: https://tu-frontend.vercel.app
+        value: https://whatsapp-gesture-frontend-app.vercel.app,http://localhost:5173
 
       # WhatsApp / Meta — configurar como SECRET
       - key: PROVIDER
