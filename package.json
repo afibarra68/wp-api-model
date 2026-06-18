@@ -10,6 +10,7 @@
     "seed": "tsx src/seed/index.ts",
     "db:setup": "psql \"$DATABASE_URL\" -f sql/setup.sql",
     "smoke": "tsx scripts/smoke.ts",
+    "test:do": "bash scripts/test-digitalocean.sh",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f api",

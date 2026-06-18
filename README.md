@@ -50,6 +50,22 @@ sudo systemctl reload caddy
 
 Webhook Meta: `https://api.tudominio.com/api/v1/webhooks/whatsapp`
 
+## Test spec Digital Ocean
+
+Tras desplegar, valida el Droplet contra la spec:
+
+```bash
+# Desde tu Mac (apunta al IP o dominio del Droplet)
+export API_URL=http://TU_DROPLET_IP:3000
+export ADMIN_EMAIL=admin@local.test
+export ADMIN_PASSWORD=Cambiar.Esto.123
+export WEBHOOK_VERIFY_TOKEN=dev-verify-token
+npm run test:do
+```
+
+Spec completa: [`spec/digitalocean.yaml`](spec/digitalocean.yaml)  
+Pruebas: health, JWT, Postgres integrations, webhook Meta, clientes.
+
 ## Comandos útiles
 
 | Comando | Descripción |

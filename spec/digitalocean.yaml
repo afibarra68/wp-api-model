@@ -1,0 +1,164 @@
+# =============================================================================
+# Digital Ocean — Droplet spec (WhatsApp Control API / wp-api-model)
+# Repo: https://github.com/afibarra68/wp-api-model
+# =============================================================================
+
+droplet:
+  name: wp-api-production
+  image: ubuntu-24-04-x64
+  size: s-1vcpu-2gb          # mínimo; recomendado s-2vcpu-4gb en prod
+  region: nyc1               # o sfo3, tor1, etc.
+  monitoring: true
+  backups: false
+  swap_gb: 2                 # obligatorio en 2 GB RAM
+
+firewall:
+  inbound:
+    - port: 22
+      protocol: tcp
+      sources: ["0.0.0.0/0", "::/0"]
+    - port: 80
+      protocol: tcp
+      sources: ["0.0.0.0/0", "::/0"]
+    - port: 443
+      protocol: tcp
+      sources: ["0.0.0.0/0", "::/0"]
+    # Solo pruebas iniciales — cerrar en prod y usar Caddy/Nginx
+    - port: 3000
+      protocol: tcp
+      sources: ["0.0.0.0/0", "::/0"]
+  outbound:
+    - protocol: tcp
+      port: all
+    - protocol: udp
+      port: all
+
+stack:
+  runtime: docker-compose
+  services:
+    postgres:
+      image: postgres:16-alpine
+      port_internal: 5432
+      memory_limit: 512M
+      health: pg_isready
+    mongodb:
+      image: mongo:7
+      port_internal: 27017
+      memory_limit: 768M
+    redis:
+      image: redis:7-alpine
+      port_internal: 6379
+      memory_limit: 256M
+    api:
+      build: Dockerfile
+      port: 3000
+      memory_limit: 512M
+      health: GET /health
+
+env_required:
+  - NODE_ENV=production
+  - PORT=3000
+  - DATABASE_URL
+  - POSTGRES_PASSWORD
+  - DB_DRIVER=mongo
+  - MONGO_URI
+  - QUEUE_DRIVER=bullmq
+  - REDIS_URL
+  - JWT_SECRET
+  - JWT_REFRESH_SECRET
+  - CORS_ORIGINS
+  - WEBHOOK_VERIFY_TOKEN
+
+env_optional:
+  - PROVIDER                    # simulation | meta-cloud | evolution
+  - WHATSAPP_TOKEN
+  - WHATSAPP_PHONE_NUMBER_ID
+  - SEED_ADMIN_EMAIL
+  - SEED_ADMIN_PASSWORD
+
+urls:
+  health: "http://DROPLET_IP:3000/health"
+  api_base: "http://DROPLET_IP:3000/api/v1"
+  webhook_meta: "https://api.TU_DOMINIO/api/v1/webhooks/whatsapp"
+
+deploy:
+  clone: "git clone https://github.com/afibarra68/wp-api-model.git"
+  setup: "./scripts/deploy.sh"
+  seed: "docker compose exec -T api npm run seed"
+
+# Matriz de pruebas post-deploy (ejecutar: npm run test:do)
+tests:
+  infrastructure:
+    - id: T01
+      name: Health endpoint
+      method: GET
+      path: /health
+      expect_status: 200
+      expect_json:
+        status: ok
+        db: up
+        postgres: up
+        redis: up
+
+    - id: T02
+      name: Docker containers running
+      command: docker compose ps
+      expect: "api.*healthy"
+
+  auth:
+    - id: T10
+      name: Login admin
+      method: POST
+      path: /api/v1/auth/login
+      body:
+        email: "${SEED_ADMIN_EMAIL}"
+        password: "${SEED_ADMIN_PASSWORD}"
+      expect_status: 200
+      expect_body_keys: [token, refreshToken]
+
+    - id: T11
+      name: Ruta protegida sin JWT
+      method: GET
+      path: /api/v1/clients
+      expect_status: 401
+
+  integrations:
+    - id: T20
+      name: Integración activa (Postgres)
+      method: GET
+      path: /api/v1/integrations/active
+      auth: true
+      expect_status: 200
+      expect_body_keys: [provider, hasWhatsappToken]
+
+  webhooks:
+    - id: T30
+      name: Verificación webhook Meta (GET challenge)
+      method: GET
+      path: "/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=${WEBHOOK_VERIFY_TOKEN}&hub.challenge=12345"
+      expect_status: 200
+      expect_body: "12345"
+
+  functional:
+    - id: T40
+      name: Listar clientes
+      method: GET
+      path: /api/v1/clients
+      auth: true
+      expect_status: 200
+
+    - id: T41
+      name: Simular mensaje entrante
+      method: POST
+      path: /api/v1/webhooks/simulate
+      body:
+        telefono: "5491100000001"
+        texto: "hola"
+      expect_status: 200
+
+acceptance_criteria:
+  - T01, T10, T11, T20, T30 deben pasar antes de conectar Meta
+  - postgres=up confirma integration_configs en PostgreSQL
+  - db=up confirma MongoDB para campañas/clientes
+  - redis=up confirma cola BullMQ operativa
+  - HTTPS obligatorio antes de webhook Meta en producción
