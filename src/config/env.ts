@@ -28,26 +28,26 @@ function list(key: string, fallback: string[] = []): string[] {
 }
 
 const isVercel = !!process.env.VERCEL;
+const isAppPlatform = !!process.env.DIGITALOCEAN_APP_ID;
 
 export const env = {
-  nodeEnv: str('NODE_ENV', isVercel ? 'production' : 'development'),
-  isProd: str('NODE_ENV', isVercel ? 'production' : 'development') === 'production',
+  nodeEnv: str('NODE_ENV', isVercel || isAppPlatform ? 'production' : 'development'),
+  isProd: str('NODE_ENV', isVercel || isAppPlatform ? 'production' : 'development') === 'production',
   isVercel,
+  isAppPlatform,
   port: num('PORT', 3000),
-  corsOrigins: list('CORS_ORIGINS', isVercel ? [] : ['http://localhost:5173']),
+  corsOrigins: list('CORS_ORIGINS', isVercel || isAppPlatform ? [] : ['http://localhost:5173']),
 
-  dbDriver: str('DB_DRIVER', isVercel ? 'mongo' : 'memory') as 'memory' | 'mongo',
+  /** PostgreSQL — única base de datos (negocio + integraciones) */
+  databaseUrl: str(
+    'DATABASE_URL',
+    'postgresql://postgres:postgres@localhost:5432/whatsapp_control',
+  ),
+  postgresSsl: str('POSTGRES_SSL', isAppPlatform ? 'true' : 'false') === 'true',
+  /** PEM del CA de DigitalOcean (opcional; en .env usar \\n entre líneas) */
+  postgresCaCert: str('POSTGRES_CA_CERT').replace(/\\n/g, '\n'),
 
-  /** PostgreSQL — configuración de integraciones WhatsApp/Meta */
-  databaseUrl: str('DATABASE_URL'),
-  postgresSsl: str('POSTGRES_SSL', 'false') === 'true',
-
-  mongoUri: str('MONGO_URI', 'mongodb://localhost:27017/whatsapp_control'),
-  // En modo "memory": persistir los datos en disco para que sobrevivan reinicios.
-  memoryDbPersist: str('MEMORY_DB_PERSIST', 'true') === 'true',
-  memoryDbPath: str('MEMORY_DB_PATH', '.data/mongo'),
-
-  queueDriver: str('QUEUE_DRIVER', isVercel ? 'db' : 'memory') as 'memory' | 'bullmq' | 'db',
+  queueDriver: str('QUEUE_DRIVER', isAppPlatform ? 'bullmq' : isVercel ? 'db' : 'memory') as 'memory' | 'bullmq' | 'db',
   cronSecret: str('CRON_SECRET'),
   redisUrl: str('REDIS_URL', 'redis://localhost:6379'),
   sendRatePerSecond: num('SEND_RATE_PER_SECOND', 2),
@@ -69,7 +69,6 @@ export const env = {
   whatsappToken: str('WHATSAPP_TOKEN'),
   whatsappPhoneNumberId: str('WHATSAPP_PHONE_NUMBER_ID'),
   whatsappApiVersion: str('WHATSAPP_API_VERSION', 'v20.0'),
-  /** Política por defecto para marketing_messages (CLOUD_API_FALLBACK | STRICT). Vacío = no enviar. */
   whatsappProductPolicy: str('WHATSAPP_PRODUCT_POLICY') as '' | 'CLOUD_API_FALLBACK' | 'STRICT',
   whatsappMessageActivitySharing: (() => {
     const v = process.env.WHATSAPP_MESSAGE_ACTIVITY_SHARING;

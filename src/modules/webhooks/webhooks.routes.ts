@@ -4,7 +4,7 @@ import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { logger } from '../../core/logger';
 import { getIntegrationSettings } from '../integrations/integration.config';
-import { ESTADOS_MENSAJE } from '../../models/messageLog.model';
+import { ESTADOS_MENSAJE } from '../../types/entities';
 import { handleInbound } from '../bot/bot.service';
 import { processMetaWebhook, updateMessageStatus } from './webhooks.service';
 

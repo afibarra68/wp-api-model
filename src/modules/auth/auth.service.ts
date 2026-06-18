@@ -2,8 +2,8 @@ import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { AppError } from '../../core/errors';
-import { User } from '../../models/user.model';
 import { Role } from '../../middlewares/auth';
+import * as userRepo from '../../repositories/user.repository';
 
 export interface PublicUser {
   id: string;
@@ -27,18 +27,18 @@ function signRefresh(userId: string): string {
 }
 
 export async function login(email: string, password: string) {
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+password_hash');
-  // Mensaje genérico para no revelar si el email existe.
-  if (!user || !user.activo) throw AppError.unauthorized('Credenciales inválidas');
+  const user = await userRepo.findUserByEmail(email, true);
+  if (!user || !user.activo || !user.passwordHash) {
+    throw AppError.unauthorized('Credenciales inválidas');
+  }
 
-  const ok = await bcrypt.compare(password, user.password_hash);
+  const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw AppError.unauthorized('Credenciales inválidas');
 
-  user.ultimo_login = new Date();
-  await user.save();
+  await userRepo.updateUser(user.id, { ultimoLogin: new Date() });
 
   const pub: PublicUser = {
-    id: String(user._id),
+    id: user.id,
     nombre: user.nombre,
     email: user.email,
     rol: user.rol as Role,
@@ -60,11 +60,11 @@ export async function refresh(refreshToken: string) {
   }
   if (payload.type !== 'refresh') throw AppError.unauthorized('Token no es de refresco');
 
-  const user = await User.findById(payload.sub);
+  const user = await userRepo.findUserById(payload.sub!);
   if (!user || !user.activo) throw AppError.unauthorized('Usuario no válido');
 
   const pub: PublicUser = {
-    id: String(user._id),
+    id: user.id,
     nombre: user.nombre,
     email: user.email,
     rol: user.rol as Role,
@@ -73,10 +73,10 @@ export async function refresh(refreshToken: string) {
 }
 
 export async function me(userId: string): Promise<PublicUser> {
-  const user = await User.findById(userId);
+  const user = await userRepo.findUserById(userId);
   if (!user) throw AppError.notFound('Usuario no encontrado');
   return {
-    id: String(user._id),
+    id: user.id,
     nombre: user.nombre,
     email: user.email,
     rol: user.rol as Role,
@@ -87,9 +87,8 @@ export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, env.bcryptRounds);
 }
 
-/** Verifica que la contraseña corresponda al usuario indicado (para acciones sensibles). */
 export async function verifyUserPassword(userId: string, password: string): Promise<boolean> {
-  const user = await User.findById(userId).select('+password_hash');
-  if (!user) return false;
-  return bcrypt.compare(password, user.password_hash);
+  const user = await userRepo.findUserById(userId, true);
+  if (!user?.passwordHash) return false;
+  return bcrypt.compare(password, user.passwordHash);
 }

@@ -1,6 +1,5 @@
 import type { Express } from 'express';
 import { env } from './config/env';
-import { connectDb } from './core/db';
 import { connectPostgres } from './core/postgres';
 import { createApp } from './core/app';
 import { startDispatcher } from './queue/dispatcher';
@@ -11,7 +10,7 @@ import { seedIntegrationFromEnv } from './modules/integrations/integration.servi
 
 let appInstance: Express | null = null;
 
-/** Inicializa DB, seed y app Express (sin listen). Reutilizable en Vercel y local. */
+/** Inicializa PostgreSQL, seed y app Express (sin listen). */
 export async function bootstrapApp(): Promise<Express> {
   if (appInstance) return appInstance;
 
@@ -19,7 +18,6 @@ export async function bootstrapApp(): Promise<Express> {
   await seedIntegrationFromEnv();
   await loadIntegrationSettings();
 
-  await connectDb();
   await seedAdmin();
   if (env.seedMockups) await seedMockups();
 

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
-import { User } from '../../models/user.model';
 import { AppError } from '../../core/errors';
+import { serializeUser } from '../../core/serializers';
+import * as userRepo from '../../repositories/user.repository';
 import { hashPassword } from '../auth/auth.service';
 
 const router = Router();
@@ -26,22 +27,11 @@ const updateSchema = z.object({
 
 const passwordSchema = z.object({ password: z.string().min(8) });
 
-function publicUser(u: InstanceType<typeof User>) {
-  return {
-    id: String(u._id),
-    nombre: u.nombre,
-    email: u.email,
-    rol: u.rol,
-    activo: u.activo,
-    ultimo_login: u.ultimo_login,
-  };
-}
-
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const users = await User.find().sort({ createdAt: -1 });
-    res.json(users.map(publicUser));
+    const users = await userRepo.findAllUsers();
+    res.json(users.map(serializeUser));
   }),
 );
 
@@ -50,24 +40,24 @@ router.post(
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
     const { nombre, email, password, rol } = req.body;
-    const exists = await User.findOne({ email: email.toLowerCase() });
+    const exists = await userRepo.findUserByEmail(email);
     if (exists) throw AppError.conflict('El email ya está registrado');
-    const user = await User.create({
+    const user = await userRepo.createUser({
       nombre,
       email,
       rol,
-      password_hash: await hashPassword(password),
+      passwordHash: await hashPassword(password),
     });
-    res.status(201).json(publicUser(user));
+    res.status(201).json(serializeUser(user));
   }),
 );
 
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const user = await User.findById(req.params.id);
+    const user = await userRepo.findUserById(req.params.id);
     if (!user) throw AppError.notFound('Usuario no encontrado');
-    res.json(publicUser(user));
+    res.json(serializeUser(user));
   }),
 );
 
@@ -75,9 +65,9 @@ router.patch(
   '/:id',
   validateBody(updateSchema),
   asyncHandler(async (req, res) => {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const user = await userRepo.updateUser(req.params.id, req.body);
     if (!user) throw AppError.notFound('Usuario no encontrado');
-    res.json(publicUser(user));
+    res.json(serializeUser(user));
   }),
 );
 
@@ -85,10 +75,11 @@ router.patch(
   '/:id/password',
   validateBody(passwordSchema),
   asyncHandler(async (req, res) => {
-    const user = await User.findById(req.params.id);
+    const user = await userRepo.findUserById(req.params.id);
     if (!user) throw AppError.notFound('Usuario no encontrado');
-    user.password_hash = await hashPassword(req.body.password);
-    await user.save();
+    await userRepo.updateUser(req.params.id, {
+      passwordHash: await hashPassword(req.body.password),
+    });
     res.json({ ok: true });
   }),
 );
@@ -99,8 +90,8 @@ router.delete(
     if (req.user?.id === req.params.id) {
       throw AppError.badRequest('No puedes eliminar tu propio usuario');
     }
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) throw AppError.notFound('Usuario no encontrado');
+    const ok = await userRepo.deleteUser(req.params.id);
+    if (!ok) throw AppError.notFound('Usuario no encontrado');
     res.json({ ok: true });
   }),
 );

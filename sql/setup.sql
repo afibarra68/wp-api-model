@@ -174,6 +174,30 @@ CREATE TABLE IF NOT EXISTS bot_rules (
 );
 
 -- -----------------------------------------------------------------------------
+-- Triggers updated_at (todas las tablas de negocio)
+-- -----------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_users_updated ON users;
+CREATE TRIGGER trg_users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_clients_updated ON clients;
+CREATE TRIGGER trg_clients_updated BEFORE UPDATE ON clients FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_templates_updated ON templates;
+CREATE TRIGGER trg_templates_updated BEFORE UPDATE ON templates FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_campaigns_updated ON campaigns;
+CREATE TRIGGER trg_campaigns_updated BEFORE UPDATE ON campaigns FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_message_logs_updated ON message_logs;
+CREATE TRIGGER trg_message_logs_updated BEFORE UPDATE ON message_logs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_conversations_updated ON conversations;
+CREATE TRIGGER trg_conversations_updated BEFORE UPDATE ON conversations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_bot_rules_updated ON bot_rules;
+CREATE TRIGGER trg_bot_rules_updated BEFORE UPDATE ON bot_rules FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- -----------------------------------------------------------------------------
 -- Seed
 -- -----------------------------------------------------------------------------
 INSERT INTO integration_configs (name, provider, is_active, webhook_verify_token, notes)

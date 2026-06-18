@@ -34,7 +34,6 @@ if [ ! -f .env ]; then
   if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' \
       -e "s/^NODE_ENV=.*/NODE_ENV=production/" \
-      -e "s/^DB_DRIVER=.*/DB_DRIVER=mongo/" \
       -e "s/^QUEUE_DRIVER=.*/QUEUE_DRIVER=bullmq/" \
       -e "s/^JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET/" \
       -e "s/^JWT_REFRESH_SECRET=.*/JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET/" \
@@ -44,7 +43,6 @@ if [ ! -f .env ]; then
   else
     sed -i \
       -e "s/^NODE_ENV=.*/NODE_ENV=production/" \
-      -e "s/^DB_DRIVER=.*/DB_DRIVER=mongo/" \
       -e "s/^QUEUE_DRIVER=.*/QUEUE_DRIVER=bullmq/" \
       -e "s/^JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET/" \
       -e "s/^JWT_REFRESH_SECRET=.*/JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET/" \

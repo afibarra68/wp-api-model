@@ -1,6 +1,5 @@
 import { env } from './config/env';
 import { logger } from './core/logger';
-import { disconnectDb } from './core/db';
 import { disconnectPostgres } from './core/postgres';
 import { closeRedis } from './core/redis';
 import { bootstrapApp } from './bootstrap';
@@ -17,7 +16,6 @@ async function bootstrap(): Promise<void> {
         port: env.port,
         provider: integration.provider,
         integration: integration.name,
-        db: env.dbDriver,
         queue: env.queueDriver,
       },
       `API escuchando en http://localhost:${env.port}`,
@@ -30,7 +28,6 @@ async function bootstrap(): Promise<void> {
     await getQueue().close();
     await closeRedis();
     await disconnectPostgres();
-    await disconnectDb();
     process.exit(0);
   };
 

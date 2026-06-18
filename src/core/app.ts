@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { env } from '../config/env';
 import { logger } from './logger';
-import { dbStatus } from './db';
 import { postgresStatus } from './postgres';
 import { getIntegrationSettings } from '../modules/integrations/integration.config';
 import { redisStatus } from './redis';
@@ -25,15 +24,15 @@ export function createApp(): Express {
   app.use(express.json({ limit: '2mb' }));
   app.use(pinoHttp({ logger }));
 
-  // Health (sin auth).
   app.get('/health', async (_req, res) => {
     const integration = getIntegrationSettings();
+    const pg = await postgresStatus();
     res.json({
-      status: 'ok',
+      status: pg === 'up' ? 'ok' : 'degraded',
       provider: integration.provider,
       integration: integration.name,
-      db: dbStatus(),
-      postgres: await postgresStatus(),
+      db: pg,
+      postgres: pg,
       redis: await redisStatus(),
       uptime: process.uptime(),
     });

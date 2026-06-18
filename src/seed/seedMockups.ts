@@ -1,15 +1,14 @@
 import { logger } from '../core/logger';
-import { Client } from '../models/client.model';
-import { Template } from '../models/template.model';
-import { BotRule } from '../models/botRule.model';
+import * as clientRepo from '../repositories/client.repository';
+import * as templateRepo from '../repositories/template.repository';
+import * as convRepo from '../repositories/conversation.repository';
 
 const CIUDADES = ['Cali', 'Bogotá', 'Medellín', 'Barranquilla'];
 const SEGMENTOS = ['premium', 'frecuente', 'nuevo'];
 
-/** Crea datos de prueba (clientes, plantillas, reglas) si las colecciones están vacías. */
 export async function seedMockups(): Promise<void> {
-  if ((await Template.countDocuments()) === 0) {
-    await Template.create([
+  if ((await templateRepo.countTemplates()) === 0) {
+    await templateRepo.createTemplatesBulk([
       {
         nombre_meta: 'notificacion_pedido',
         idioma: 'es',
@@ -44,24 +43,23 @@ export async function seedMockups(): Promise<void> {
     logger.info('Seed: plantillas de prueba creadas');
   }
 
-  if ((await Client.countDocuments()) === 0) {
+  if ((await clientRepo.countAllClients()) === 0) {
     const clientes = Array.from({ length: 20 }).map((_, i) => {
       const n = i + 1;
       return {
         nombre: `Cliente ${n}`,
         telefono: `5730010${String(n).padStart(5, '0')}`,
-        activo: n % 7 !== 0, // algunos inactivos
-        opt_in: n % 11 !== 0, // algunos sin consentimiento
+        opt_in: n % 11 !== 0,
         etiquetas: [CIUDADES[i % CIUDADES.length].toLowerCase(), SEGMENTOS[i % SEGMENTOS.length]],
         metadata: { ciudad: CIUDADES[i % CIUDADES.length], segmento: SEGMENTOS[i % SEGMENTOS.length] },
       };
     });
-    await Client.insertMany(clientes);
+    await clientRepo.bulkUpsertClients(clientes);
     logger.info('Seed: 20 clientes de prueba creados');
   }
 
-  if ((await BotRule.countDocuments()) === 0) {
-    await BotRule.create([
+  if ((await convRepo.countBotRules()) === 0) {
+    await convRepo.createBotRulesBulk([
       {
         nombre: 'precios',
         palabras_clave: ['precio', 'tarifa', 'costo'],
@@ -71,7 +69,8 @@ export async function seedMockups(): Promise<void> {
       {
         nombre: 'saludo',
         palabras_clave: ['hola', 'buenas', 'info'],
-        respuesta: '¡Hola! Gracias por escribirnos. Escribe "precio" para ver tarifas o "asesor" para hablar con una persona.',
+        respuesta:
+          '¡Hola! Gracias por escribirnos. Escribe "precio" para ver tarifas o "asesor" para hablar con una persona.',
         prioridad: 1,
       },
     ]);

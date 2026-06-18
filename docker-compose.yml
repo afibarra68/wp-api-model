@@ -20,20 +20,6 @@ services:
         limits:
           memory: 512M
 
-  mongodb:
-    image: mongo:7
-    container_name: wc-mongodb
-    restart: unless-stopped
-    command: mongod --wiredTigerCacheSizeGB 0.25
-    environment:
-      MONGO_INITDB_DATABASE: whatsapp_control
-    volumes:
-      - mongo_data:/data/db
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-
   redis:
     image: redis:7-alpine
     container_name: wc-redis
@@ -56,8 +42,6 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-whatsapp_control}
       POSTGRES_SSL: 'false'
-      DB_DRIVER: mongo
-      MONGO_URI: mongodb://mongodb:27017/whatsapp_control
       QUEUE_DRIVER: bullmq
       REDIS_URL: redis://redis:6379
     ports:
@@ -65,8 +49,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mongodb:
-        condition: service_started
       redis:
         condition: service_started
     healthcheck:
@@ -82,5 +64,4 @@ services:
 
 volumes:
   postgres_data:
-  mongo_data:
   redis_data:

@@ -1,4 +1,4 @@
-import { connectDb, disconnectDb } from '../core/db';
+import { connectPostgres, disconnectPostgres } from '../core/postgres';
 import { env } from '../config/env';
 import { logger } from '../core/logger';
 import { seedAdmin } from './seedAdmin';
@@ -6,10 +6,10 @@ import { seedMockups } from './seedMockups';
 
 /** Ejecuta el seed de forma independiente: `npm run seed`. */
 async function run(): Promise<void> {
-  await connectDb();
+  await connectPostgres();
   await seedAdmin();
   if (env.seedMockups) await seedMockups();
-  await disconnectDb();
+  await disconnectPostgres();
   logger.info('Seed completado');
 }
 

@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
-import { Campaign } from '../../models/campaign.model';
-import { MessageLog } from '../../models/messageLog.model';
 import { AppError } from '../../core/errors';
+import { serializeCampaign, serializeMessageLog } from '../../core/serializers';
+import * as campaignRepo from '../../repositories/campaign.repository';
+import * as messageLogRepo from '../../repositories/messageLog.repository';
 import * as svc from './campaigns.service';
 
 const router = Router();
@@ -36,17 +37,8 @@ router.get(
     const { estado } = req.query as Record<string, string>;
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-    const filter: Record<string, unknown> = {};
-    if (estado) filter.estado = estado;
-
-    const [items, total] = await Promise.all([
-      Campaign.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-      Campaign.countDocuments(filter),
-    ]);
-    res.json({ items, total, page, limit });
+    const { items, total } = await campaignRepo.findCampaigns(estado, page, limit);
+    res.json({ items: items.map(serializeCampaign), total, page, limit });
   }),
 );
 
@@ -54,8 +46,8 @@ router.post(
   '/',
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
-    const campaign = await Campaign.create(req.body);
-    res.status(201).json(campaign);
+    const campaign = await campaignRepo.createCampaign(req.body);
+    res.status(201).json(serializeCampaign(campaign));
   }),
 );
 
@@ -63,9 +55,9 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     if (!svc.isValidId(req.params.id)) throw AppError.badRequest('ID inválido');
-    const campaign = await Campaign.findById(req.params.id);
+    const campaign = await campaignRepo.findCampaignById(req.params.id);
     if (!campaign) throw AppError.notFound('Campaña no encontrada');
-    res.json(campaign);
+    res.json(serializeCampaign(campaign));
   }),
 );
 
@@ -86,14 +78,16 @@ router.post(
 router.post(
   '/:id/pause',
   asyncHandler(async (req, res) => {
-    res.json(await svc.pauseCampaign(req.params.id));
+    const c = await svc.pauseCampaign(req.params.id);
+    res.json(serializeCampaign(c!));
   }),
 );
 
 router.post(
   '/:id/resume',
   asyncHandler(async (req, res) => {
-    res.json(await svc.resumeCampaign(req.params.id));
+    const c = await svc.resumeCampaign(req.params.id);
+    res.json(serializeCampaign(c!));
   }),
 );
 
@@ -104,17 +98,13 @@ router.get(
     const { estado } = req.query as Record<string, string>;
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
-    const filter: Record<string, unknown> = { campana_id: req.params.id };
-    if (estado) filter.estado_actual = estado;
-
-    const [items, total] = await Promise.all([
-      MessageLog.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-      MessageLog.countDocuments(filter),
-    ]);
-    res.json({ items, total, page, limit });
+    const { items, total } = await messageLogRepo.findMessageLogs(
+      req.params.id,
+      estado,
+      page,
+      limit,
+    );
+    res.json({ items: items.map(serializeMessageLog), total, page, limit });
   }),
 );
 

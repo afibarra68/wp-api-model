@@ -1,13 +1,13 @@
 import { env } from '../config/env';
 import { logger } from '../core/logger';
-import { MessageLog } from '../models/messageLog.model';
+import * as messageLogRepo from '../repositories/messageLog.repository';
 import { buildJobFromLog, processEmissionJob } from './emission.processor';
 import { EmissionJob, JobProcessor, MessageQueue } from './queue.interface';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Cola respaldada por MongoDB (MessageLog en estado "encolado").
+ * Cola respaldada por PostgreSQL (message_logs en estado "encolado").
  * Pensada para Vercel/serverless: el cron procesa lotes periódicamente.
  */
 export class DbQueue implements MessageQueue {
@@ -25,7 +25,6 @@ export class DbQueue implements MessageQueue {
     this.processor = processor;
   }
 
-  /** Los jobs ya están en MessageLog; el cron los procesa. */
   async add(_job: EmissionJob): Promise<void> {}
 
   async addBulk(_jobs: EmissionJob[]): Promise<void> {}
@@ -40,19 +39,16 @@ export class DbQueue implements MessageQueue {
 
   async close(): Promise<void> {}
 
-  /** Procesa hasta maxJobs mensajes encolados (invocado por cron en Vercel). */
   async runBatch(maxJobs: number): Promise<number> {
     if (this.paused) return 0;
 
-    const logs = await MessageLog.find({ estado_actual: 'encolado' })
-      .sort({ createdAt: 1 })
-      .limit(maxJobs);
+    const logs = await messageLogRepo.findQueuedLogs(maxJobs);
 
     let processed = 0;
     for (const log of logs) {
       const job = await buildJobFromLog(log);
       if (!job) {
-        logger.warn({ logId: log._id }, 'No se pudo reconstruir job de emisión');
+        logger.warn({ logId: log.id }, 'No se pudo reconstruir job de emisión');
         continue;
       }
       await this.processor(job);

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
-import { Template } from '../../models/template.model';
 import { AppError } from '../../core/errors';
+import { serializeTemplate } from '../../core/serializers';
+import * as templateRepo from '../../repositories/template.repository';
 
 const router = Router();
 
@@ -38,8 +39,8 @@ const updateSchema = z.object({
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const items = await Template.find().sort({ createdAt: -1 });
-    res.json(items);
+    const items = await templateRepo.findAllTemplates();
+    res.json(items.map(serializeTemplate));
   }),
 );
 
@@ -47,17 +48,17 @@ router.post(
   '/',
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
-    const template = await Template.create(req.body);
-    res.status(201).json(template);
+    const template = await templateRepo.createTemplate(req.body);
+    res.status(201).json(serializeTemplate(template));
   }),
 );
 
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const template = await Template.findById(req.params.id);
+    const template = await templateRepo.findTemplateById(req.params.id);
     if (!template) throw AppError.notFound('Plantilla no encontrada');
-    res.json(template);
+    res.json(serializeTemplate(template));
   }),
 );
 
@@ -65,17 +66,17 @@ router.patch(
   '/:id',
   validateBody(updateSchema),
   asyncHandler(async (req, res) => {
-    const template = await Template.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const template = await templateRepo.updateTemplate(req.params.id, req.body);
     if (!template) throw AppError.notFound('Plantilla no encontrada');
-    res.json(template);
+    res.json(serializeTemplate(template));
   }),
 );
 
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
-    const template = await Template.findByIdAndDelete(req.params.id);
-    if (!template) throw AppError.notFound('Plantilla no encontrada');
+    const ok = await templateRepo.deleteTemplate(req.params.id);
+    if (!ok) throw AppError.notFound('Plantilla no encontrada');
     res.json({ ok: true });
   }),
 );

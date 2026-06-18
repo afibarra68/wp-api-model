@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
-import { BotRule } from '../../models/botRule.model';
-import { Conversation } from '../../models/conversation.model';
 import { AppError } from '../../core/errors';
+import { serializeBotRule, serializeConversation } from '../../core/serializers';
+import * as convRepo from '../../repositories/conversation.repository';
 import { getProvider } from '../../providers';
 
 const router = Router();
@@ -21,12 +21,12 @@ const ruleSchema = z.object({
   prioridad: z.number().int().default(0),
 });
 
-// --- Reglas del bot (solo admin) ---
 router.get(
   '/rules',
   requireRole('admin'),
   asyncHandler(async (_req, res) => {
-    res.json(await BotRule.find().sort({ prioridad: -1 }));
+    const rules = await convRepo.findAllBotRules();
+    res.json(rules.map(serializeBotRule));
   }),
 );
 
@@ -35,7 +35,8 @@ router.post(
   requireRole('admin'),
   validateBody(ruleSchema),
   asyncHandler(async (req, res) => {
-    res.status(201).json(await BotRule.create(req.body));
+    const rule = await convRepo.createBotRule(req.body);
+    res.status(201).json(serializeBotRule(rule));
   }),
 );
 
@@ -44,9 +45,9 @@ router.patch(
   requireRole('admin'),
   validateBody(ruleSchema.partial()),
   asyncHandler(async (req, res) => {
-    const rule = await BotRule.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const rule = await convRepo.updateBotRule(req.params.id, req.body);
     if (!rule) throw AppError.notFound('Regla no encontrada');
-    res.json(rule);
+    res.json(serializeBotRule(rule));
   }),
 );
 
@@ -54,15 +55,14 @@ router.delete(
   '/rules/:id',
   requireRole('admin'),
   asyncHandler(async (req, res) => {
-    const rule = await BotRule.findByIdAndDelete(req.params.id);
-    if (!rule) throw AppError.notFound('Regla no encontrada');
+    const ok = await convRepo.deleteBotRule(req.params.id);
+    if (!ok) throw AppError.notFound('Regla no encontrada');
     res.json({ ok: true });
   }),
 );
 
 export default router;
 
-// --- Conversaciones (admin, operador, agente) ---
 export const conversationsRouter = Router();
 conversationsRouter.use(authJwt, requireRole('admin', 'operador', 'agente'));
 
@@ -70,22 +70,17 @@ conversationsRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const { modo } = req.query as Record<string, string>;
-    const filter: Record<string, unknown> = {};
-    if (modo) filter.modo = modo;
-    res.json(await Conversation.find(filter).sort({ ultima_actividad: -1 }).limit(200));
+    const items = await convRepo.findConversations(modo);
+    res.json(items.map(serializeConversation));
   }),
 );
 
 conversationsRouter.post(
   '/:id/handoff',
   asyncHandler(async (req, res) => {
-    const conv = await Conversation.findByIdAndUpdate(
-      req.params.id,
-      { $set: { modo: 'humano' } },
-      { new: true },
-    );
+    const conv = await convRepo.setConversationModo(req.params.id, 'humano');
     if (!conv) throw AppError.notFound('Conversación no encontrada');
-    res.json(conv);
+    res.json(serializeConversation(conv));
   }),
 );
 
@@ -98,9 +93,9 @@ conversationsRouter.post(
   '/:id/reply',
   validateBody(replySchema),
   asyncHandler(async (req, res) => {
-    const conv = await Conversation.findById(req.params.id);
+    const conv = await convRepo.findConversationById(req.params.id);
     if (!conv) throw AppError.notFound('Conversación no encontrada');
-    const abierta = conv.ventana_abierta_hasta && conv.ventana_abierta_hasta > new Date();
+    const abierta = conv.ventanaAbiertaHasta && conv.ventanaAbiertaHasta > new Date();
     if (!abierta) {
       throw AppError.badRequest('La ventana de 24h está cerrada; usa una plantilla');
     }
@@ -109,10 +104,7 @@ conversationsRouter.post(
       text: req.body.texto,
       replyToMessageId: req.body.reply_to_message_id,
     });
-    await Conversation.updateOne(
-      { _id: conv._id },
-      { $set: { ultima_actividad: new Date() } },
-    );
+    await convRepo.touchConversation(conv.id);
     res.json({ ok: true, messageId: result.messageId });
   }),
 );

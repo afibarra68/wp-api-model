@@ -1,12 +1,11 @@
 /**
- * Smoke test del flujo completo en modo simulación (sin Mongo/Redis externos).
- * Levanta la API con DB en memoria y cola en memoria, y ejecuta:
- *   login -> crear campaña -> preview -> launch -> esperar -> report
- *   -> simular webhook de entrega -> simular mensaje entrante (bot).
+ * Smoke test del flujo completo en modo simulación.
+ * Requiere PostgreSQL local (DATABASE_URL) y cola en memoria.
  *
  * Uso: npm run smoke
  */
-process.env.DB_DRIVER = 'memory';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/whatsapp_control';
 process.env.QUEUE_DRIVER = 'memory';
 process.env.PROVIDER = 'simulation';
 process.env.SEED_MOCKUPS = 'true';
@@ -42,7 +41,7 @@ async function api(path: string, opts: RequestInit = {}, token?: string) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const { connectDb, disconnectDb } = await import('../src/core/db');
+  const { connectPostgres, disconnectPostgres } = await import('../src/core/postgres');
   const { createApp } = await import('../src/core/app');
   const { startDispatcher } = await import('../src/queue/dispatcher');
   const { getQueue } = await import('../src/queue');
@@ -50,7 +49,7 @@ async function main() {
   const { seedMockups } = await import('../src/seed/seedMockups');
   const { env } = await import('../src/config/env');
 
-  await connectDb();
+  await connectPostgres();
   await seedAdmin();
   await seedMockups();
   startDispatcher();
@@ -175,7 +174,7 @@ async function main() {
   } finally {
     server.close();
     await getQueue().close();
-    await disconnectDb();
+    await disconnectPostgres();
   }
 }
 

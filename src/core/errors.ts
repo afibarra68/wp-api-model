@@ -59,14 +59,14 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     });
   }
 
-  // Errores de Mongo duplicado (índice único)
-  const anyErr = err as { code?: number; keyValue?: Record<string, unknown> };
-  if (anyErr && anyErr.code === 11000) {
+  // Errores de PostgreSQL duplicado (índice único)
+  const pgErr = err as { code?: string; constraint?: string; detail?: string };
+  if (pgErr?.code === '23505') {
     return res.status(409).json({
       error: {
         code: 'CONFLICT',
         message: 'Registro duplicado',
-        details: anyErr.keyValue,
+        details: pgErr.detail ?? pgErr.constraint,
       },
     });
   }

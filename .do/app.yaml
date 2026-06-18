@@ -1,0 +1,104 @@
+# DigitalOcean App Platform — spec
+# Crear:  doctl apps create --spec .do/app.yaml
+# Solo PostgreSQL + Redis (sin MongoDB)
+
+name: wp-api-model
+region: nyc
+
+services:
+  - name: api
+    github:
+      repo: afibarra68/wp-api-model
+      branch: main
+      deploy_on_push: true
+
+    dockerfile_path: Dockerfile
+    source_dir: /
+
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: basic-xs
+
+    health_check:
+      initial_delay_seconds: 45
+      period_seconds: 30
+      timeout_seconds: 10
+      http_path: /health
+      success_threshold: 1
+      failure_threshold: 3
+
+    envs:
+      - key: NODE_ENV
+        value: production
+
+      # PostgreSQL gestionado (toda la app)
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+      - key: POSTGRES_SSL
+        value: "true"
+      - key: POSTGRES_CA_CERT
+        scope: RUN_TIME
+        type: SECRET
+
+      # Redis gestionado (cola BullMQ)
+      - key: QUEUE_DRIVER
+        value: bullmq
+      - key: REDIS_URL
+        scope: RUN_TIME
+        value: ${redis.REDIS_URL}
+      - key: SEND_RATE_PER_SECOND
+        value: "2"
+
+      # Auth — generar secretos en el panel (tipo SECRET)
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_REFRESH_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: SEED_ADMIN_EMAIL
+        value: admin@local.test
+      - key: SEED_ADMIN_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+      - key: SEED_MOCKUPS
+        value: "false"
+
+      # CORS — URL de tu frontend
+      - key: CORS_ORIGINS
+        value: https://tu-frontend.vercel.app
+
+      # WhatsApp / Meta — configurar como SECRET
+      - key: PROVIDER
+        value: meta-cloud
+      - key: WHATSAPP_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: WHATSAPP_API_VERSION
+        value: v20.0
+      - key: WEBHOOK_VERIFY_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    production: true
+
+  - name: redis
+    engine: REDIS
+    version: "7"
+    production: true
+
+ingress:
+  rules:
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /

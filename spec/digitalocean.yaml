@@ -1,6 +1,6 @@
 # =============================================================================
-# Digital Ocean — Droplet spec (WhatsApp Control API / wp-api-model)
-# Repo: https://github.com/afibarra68/wp-api-model
+# Digital Ocean — Droplet spec (WhatsApp Control API)
+# Repo de despliegue: https://github.com/afibarra68/wp-api-model
 # =============================================================================
 
 droplet:
