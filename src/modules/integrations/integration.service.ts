@@ -80,6 +80,34 @@ export async function refreshIntegration(): Promise<IntegrationSettings> {
   return loadIntegrationSettings();
 }
 
+/** Sincroniza secretos de .env → integración activa en Postgres. */
+export async function syncIntegrationSecretsFromEnv(): Promise<void> {
+  if (!isPostgresConnected()) return;
+  const active = await repo.findActive();
+  if (!active) return;
+
+  const { settingsFromEnv } = await import('./integration.config');
+  const s = settingsFromEnv();
+  const patch: Partial<UpsertIntegrationInput> = {};
+
+  if (s.webhookVerifyToken && s.webhookVerifyToken !== active.webhookVerifyToken) {
+    patch.webhookVerifyToken = s.webhookVerifyToken;
+  }
+  if (s.provider !== active.provider) patch.provider = s.provider;
+  if (s.whatsappToken && s.whatsappToken !== (active.whatsappToken ?? '')) {
+    patch.whatsappToken = s.whatsappToken;
+  }
+  if (s.whatsappPhoneNumberId && s.whatsappPhoneNumberId !== (active.whatsappPhoneNumberId ?? '')) {
+    patch.whatsappPhoneNumberId = s.whatsappPhoneNumberId;
+  }
+
+  if (!Object.keys(patch).length) return;
+
+  await repo.update(active.id, patch);
+  invalidateIntegrationCache();
+  await loadIntegrationSettings();
+}
+
 /** Sincroniza .env → Postgres si la tabla está vacía (bootstrap). */
 export async function seedIntegrationFromEnv(): Promise<void> {
   if (!isPostgresConnected()) return;

@@ -3,10 +3,16 @@
 **Repositorio de despliegue:** https://github.com/afibarra68/wp-api-model  
 App Platform y Docker despliegan desde ese repo (código en la raíz).
 
-Desarrollo en monorepo: https://github.com/afibarra68/proyecto-api-watsapp (carpeta `backend/`).  
-Para publicar cambios al repo de deploy: `./scripts/push-to-wp-api-model.sh` desde esta carpeta.
+Para publicar cambios: `./scripts/push-to-wp-api-model.sh` desde esta carpeta.
 
 API Express para envío masivo WhatsApp, webhooks Meta, bot y colas.
+
+## Configuración
+
+```bash
+cp config.env.example config.env   # editar credenciales
+./scripts/sync-env.sh              # genera .env (y frontend/.env)
+```
 
 ## Stack
 
@@ -18,8 +24,8 @@ API Express para envío masivo WhatsApp, webhooks Meta, bot y colas.
 ## Desarrollo local
 
 ```bash
-cd backend
-cp .env.example .env
+cp config.env.example config.env
+./scripts/sync-env.sh
 npm install
 docker compose up -d postgres redis
 npm run dev

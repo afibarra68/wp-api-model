@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { logger } from '../../core/logger';
+import { env } from '../../config/env';
 import { getIntegrationSettings } from '../integrations/integration.config';
 import { ESTADOS_MENSAJE } from '../../types/entities';
 import { handleInbound } from '../bot/bot.service';
@@ -10,12 +11,19 @@ import { processMetaWebhook, updateMessageStatus } from './webhooks.service';
 
 const router = Router();
 
+function isValidVerifyToken(token: unknown): boolean {
+  const value = String(token ?? '');
+  if (!value) return false;
+  const settings = getIntegrationSettings();
+  return value === settings.webhookVerifyToken || value === env.webhookVerifyToken;
+}
+
 // Verificación del webhook (Meta hace un GET con hub.challenge).
 router.get('/whatsapp', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  if (mode === 'subscribe' && token === getIntegrationSettings().webhookVerifyToken) {
+  if (mode === 'subscribe' && isValidVerifyToken(token)) {
     return res.status(200).send(String(challenge));
   }
   return res.sendStatus(403);
