@@ -5,7 +5,7 @@
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
     "seed": "tsx src/seed/index.ts",
     "db:setup": "psql \"$DATABASE_URL\" -f sql/setup.sql",
