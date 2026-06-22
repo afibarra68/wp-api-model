@@ -4,6 +4,7 @@ import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
 import * as svc from './integration.service';
+import * as metaPhone from './metaPhone.service';
 import { UpsertIntegrationInput } from './integration.types';
 
 const router = Router();
@@ -102,6 +103,65 @@ router.post(
   '/refresh',
   asyncHandler(async (_req, res) => {
     res.json(await svc.refreshIntegration());
+  }),
+);
+
+const requestCodeSchema = z.object({
+  code_method: z.enum(['SMS', 'VOICE']).default('SMS'),
+  language: z.string().min(2).default('es'),
+  phone_number_id: z.string().min(1).optional(),
+});
+
+const verifyCodeSchema = z.object({
+  code: z.string().min(1),
+  phone_number_id: z.string().min(1).optional(),
+});
+
+const registerPhoneSchema = z.object({
+  pin: z.string().min(6).max(6),
+  phone_number_id: z.string().min(1).optional(),
+});
+
+/** Solicita código de verificación a Meta (SMS o VOICE). */
+router.post(
+  '/whatsapp/request-code',
+  validateBody(requestCodeSchema),
+  asyncHandler(async (req, res) => {
+    res.json(
+      await metaPhone.requestVerificationCode({
+        codeMethod: req.body.code_method,
+        language: req.body.language,
+        phoneNumberId: req.body.phone_number_id,
+      }),
+    );
+  }),
+);
+
+/** Verifica el código de 6 dígitos recibido por SMS o llamada. */
+router.post(
+  '/whatsapp/verify-code',
+  validateBody(verifyCodeSchema),
+  asyncHandler(async (req, res) => {
+    res.json(
+      await metaPhone.verifyPhoneCode({
+        code: req.body.code,
+        phoneNumberId: req.body.phone_number_id,
+      }),
+    );
+  }),
+);
+
+/** Registra el número en Cloud API con PIN de verificación en dos pasos. */
+router.post(
+  '/whatsapp/register',
+  validateBody(registerPhoneSchema),
+  asyncHandler(async (req, res) => {
+    res.json(
+      await metaPhone.registerPhoneNumber({
+        pin: req.body.pin,
+        phoneNumberId: req.body.phone_number_id,
+      }),
+    );
   }),
 );
 

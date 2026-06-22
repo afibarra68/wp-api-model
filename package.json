@@ -9,6 +9,7 @@
     "start": "node dist/src/server.js",
     "seed": "tsx src/seed/index.ts",
     "db:setup": "psql \"$DATABASE_URL\" -f sql/setup.sql",
+    "db:migrate": "psql \"$DATABASE_URL\" -f sql/migrate-templates-components.sql",
     "smoke": "tsx scripts/smoke.ts",
     "test:do": "bash scripts/test-digitalocean.sh",
     "docker:up": "docker compose up -d --build",

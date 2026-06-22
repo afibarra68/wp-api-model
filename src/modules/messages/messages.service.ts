@@ -1,5 +1,6 @@
 import { AppError } from '../../core/errors';
 import { isValidId } from '../../core/id';
+import { templateSendOptions } from '../../core/templateSend';
 import type { Template } from '../../types/entities';
 import * as clientRepo from '../../repositories/client.repository';
 import * as convRepo from '../../repositories/conversation.repository';
@@ -68,11 +69,7 @@ function buildSendInput(
 ) {
   return {
     to: telefono,
-    templateName: template.nombreMeta,
-    languageCode: template.idioma,
-    templateCategory: template.categoria,
-    variables,
-    headerImageUrl: template.headerTipo === 'image' ? template.headerUrl : null,
+    ...templateSendOptions(template, variables),
     productPolicy: opts?.productPolicy,
     messageActivitySharing: opts?.messageActivitySharing,
   };

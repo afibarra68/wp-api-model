@@ -17,30 +17,111 @@ const variableSchema = z.object({
   ejemplo: z.string().optional(),
 });
 
-const createSchema = z.object({
-  nombre_meta: z.string().min(1),
-  idioma: z.string().min(2).default('es'),
-  categoria: z.enum(['marketing', 'utility', 'authentication']).default('utility'),
-  header_tipo: z.enum(['none', 'image']).default('none'),
+const buttonSchema = z.object({
+  tipo: z.enum(['quick_reply', 'url', 'phone']),
+  texto: z.string().min(1),
+  url: z.string().url().nullable().optional(),
+  telefono: z.string().nullable().optional(),
+});
+
+const templateBodySchema = z.object({
+  header_tipo: z.enum(['none', 'image', 'text']).default('none'),
   header_url: z.string().url().nullable().optional(),
+  header_text: z.string().nullable().optional(),
+  footer: z.string().nullable().optional(),
+  botones: z.array(buttonSchema).max(3).default([]),
   cuerpo: z.string().min(1),
   variables: z.array(variableSchema).default([]),
 });
 
-const updateSchema = z.object({
-  estado: z.enum(['borrador', 'pendiente', 'aprobada', 'rechazada']).optional(),
-  cuerpo: z.string().min(1).optional(),
-  categoria: z.enum(['marketing', 'utility', 'authentication']).optional(),
-  header_tipo: z.enum(['none', 'image']).optional(),
-  header_url: z.string().url().nullable().optional(),
-  variables: z.array(variableSchema).optional(),
-});
+function validateTemplateComponents(
+  data: z.infer<typeof templateBodySchema>,
+  ctx: z.RefinementCtx,
+) {
+  if (data.header_tipo === 'image' && !data.header_url) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Indica header_url cuando header_tipo es image',
+      path: ['header_url'],
+    });
+  }
+  if (data.header_tipo === 'text' && !data.header_text?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Indica header_text cuando header_tipo es text',
+      path: ['header_text'],
+    });
+  }
+  data.botones.forEach((btn, i) => {
+    if (btn.tipo === 'url' && !btn.url) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Los botones URL requieren url',
+        path: ['botones', i, 'url'],
+      });
+    }
+    if (btn.tipo === 'phone' && !btn.telefono) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Los botones de teléfono requieren telefono',
+        path: ['botones', i, 'telefono'],
+      });
+    }
+  });
+}
+
+const createSchema = templateBodySchema
+  .extend({
+    nombre_meta: z.string().min(1),
+    idioma: z.string().min(2).default('es'),
+    categoria: z.enum(['marketing', 'utility', 'authentication']).default('utility'),
+  })
+  .superRefine(validateTemplateComponents);
+
+const updateSchema = templateBodySchema
+  .partial()
+  .extend({
+    estado: z.enum(['borrador', 'pendiente', 'aprobada', 'rechazada']).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.header_tipo !== undefined ||
+      data.header_url !== undefined ||
+      data.header_text !== undefined ||
+      data.botones !== undefined
+    ) {
+      validateTemplateComponents(
+        {
+          header_tipo: data.header_tipo ?? 'none',
+          header_url: data.header_url,
+          header_text: data.header_text,
+          footer: data.footer ?? null,
+          botones: data.botones ?? [],
+          cuerpo: data.cuerpo ?? 'x',
+          variables: data.variables ?? [],
+        },
+        ctx,
+      );
+    }
+  });
 
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
     const items = await templateRepo.findAllTemplates();
     res.json(items.map(serializeTemplate));
+  }),
+);
+
+/** Plantilla oficial de prueba Meta (hello_world / en_US). */
+router.get(
+  '/hello-world',
+  asyncHandler(async (_req, res) => {
+    const template = await templateRepo.findTemplateByMetaName('hello_world', 'en_US');
+    if (!template) {
+      throw AppError.notFound('Plantilla hello_world no encontrada. Reinicia el servidor o ejecuta npm run seed');
+    }
+    res.json(serializeTemplate(template));
   }),
 );
 

@@ -97,8 +97,11 @@ CREATE TABLE IF NOT EXISTS templates (
     CHECK (categoria IN ('marketing', 'utility', 'authentication')),
   estado       TEXT NOT NULL DEFAULT 'borrador'
     CHECK (estado IN ('borrador', 'pendiente', 'aprobada', 'rechazada')),
-  header_tipo  TEXT NOT NULL DEFAULT 'none' CHECK (header_tipo IN ('none', 'image')),
+  header_tipo  TEXT NOT NULL DEFAULT 'none' CHECK (header_tipo IN ('none', 'image', 'text')),
   header_url   TEXT,
+  header_text  TEXT,
+  footer       TEXT,
+  botones      JSONB NOT NULL DEFAULT '[]',
   cuerpo       TEXT NOT NULL,
   variables    JSONB NOT NULL DEFAULT '[]',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),

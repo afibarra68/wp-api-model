@@ -1,5 +1,6 @@
 import { AppError } from '../../core/errors';
 import { clientForMapeo } from '../../core/serializers';
+import { renderTemplateText } from '../../core/templateSend';
 import { isValidId } from '../../core/id';
 import type { Client, CampaignMapeo, CampaignSegmento } from '../../types/entities';
 import * as campaignRepo from '../../repositories/campaign.repository';
@@ -45,14 +46,25 @@ export async function previewCampaign(campaignId: string) {
   const total = await clientRepo.countClientsForSegment(filter);
   const sample = await clientRepo.findOneClientForSegment(filter);
 
-  let ejemplo: { variables: string[]; texto: string } | null = null;
+  let ejemplo: {
+    variables: string[];
+    titulo: string | null;
+    texto: string;
+    footer: string | null;
+    botones: string[];
+  } | null = null;
   if (sample) {
     const variables = resolveVariables(sample, campaign.mapeoVariables);
-    let texto = template.cuerpo;
-    variables.forEach((v, i) => {
-      texto = texto.replace(new RegExp(`\\{\\{${i + 1}\\}\\}`, 'g'), v);
-    });
-    ejemplo = { variables, texto };
+    ejemplo = {
+      variables,
+      titulo:
+        template.headerTipo === 'text' && template.headerText
+          ? renderTemplateText(template.headerText, variables)
+          : null,
+      texto: renderTemplateText(template.cuerpo, variables),
+      footer: template.footer,
+      botones: template.botones.map((b) => b.texto),
+    };
   }
 
   return {
@@ -60,6 +72,9 @@ export async function previewCampaign(campaignId: string) {
     plantilla: template.nombreMeta,
     total_destinatarios: total,
     banner: template.headerTipo === 'image' ? template.headerUrl : null,
+    titulo: template.headerTipo === 'text' ? template.headerText : null,
+    footer: template.footer,
+    botones: template.botones,
     ejemplo,
   };
 }
@@ -97,11 +112,8 @@ export async function launchCampaign(campaignId: string) {
     campaignId: campaign.id,
     clientId: c.id,
     telefono: c.telefono,
-    templateName: template.nombreMeta,
-    languageCode: template.idioma,
-    templateCategory: template.categoria,
+    templateId: template.id,
     variables: resolveVariables(c, campaign.mapeoVariables),
-    headerImageUrl: template.headerTipo === 'image' ? template.headerUrl : null,
   }));
 
   await campaignRepo.updateCampaign(campaign.id, {

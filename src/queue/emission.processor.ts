@@ -1,4 +1,5 @@
 import { logger } from '../core/logger';
+import { templateSendOptions } from '../core/templateSend';
 import * as campaignRepo from '../repositories/campaign.repository';
 import * as clientRepo from '../repositories/client.repository';
 import * as templateRepo from '../repositories/template.repository';
@@ -9,14 +10,19 @@ import { EmissionJob } from './queue.interface';
 
 export async function processEmissionJob(job: EmissionJob): Promise<void> {
   const provider = getProvider();
+  const template = await templateRepo.findTemplateById(job.templateId);
+  if (!template) {
+    logger.error({ templateId: job.templateId, logId: job.logId }, 'Plantilla no encontrada en cola');
+    await messageLogRepo.updateMessageLogFailed(job.logId, 'Plantilla no encontrada');
+    await campaignRepo.incrementCampaignMetric(job.campaignId, 'fallidos');
+    await campaignRepo.finalizeCampaignIfDone(job.campaignId);
+    return;
+  }
+
   try {
     const { messageId, messageStatus } = await provider.sendTemplate({
       to: job.telefono,
-      templateName: job.templateName,
-      languageCode: job.languageCode,
-      templateCategory: job.templateCategory,
-      variables: job.variables,
-      headerImageUrl: job.headerImageUrl ?? null,
+      ...templateSendOptions(template, job.variables),
     });
 
     await messageLogRepo.updateMessageLogSent(job.logId, messageId, messageStatus ?? null);
@@ -49,10 +55,7 @@ export async function buildJobFromLog(log: {
     campaignId: campaign.id,
     clientId: client.id,
     telefono: log.telefono,
-    templateName: template.nombreMeta,
-    languageCode: template.idioma,
-    templateCategory: template.categoria,
+    templateId: template.id,
     variables: resolveVariables(client, campaign.mapeoVariables),
-    headerImageUrl: template.headerTipo === 'image' ? template.headerUrl : null,
   };
 }

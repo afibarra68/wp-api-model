@@ -54,6 +54,7 @@ export async function connectPostgres(): Promise<void> {
     await client.query('SELECT 1');
     logger.info('PostgreSQL conectado');
     await ensureSchema();
+    await runMigrations();
   } finally {
     client.release();
   }
@@ -84,6 +85,31 @@ async function ensureSchema(): Promise<void> {
   const sql = fs.readFileSync(sqlPath, 'utf8');
   await pool.query(sql);
   logger.info({ sqlPath }, 'Schema PostgreSQL aplicado (setup.sql)');
+}
+
+/** Migraciones incrementales idempotentes (solo agregan lo que falta). */
+async function runMigrations(): Promise<void> {
+  if (!pool) return;
+
+  const { rows } = await pool.query<{ ok: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'templates'
+    ) AS ok
+  `);
+  if (!rows[0]?.ok) return;
+
+  const candidates = [
+    path.join(process.cwd(), 'sql/migrate-templates-components.sql'),
+    path.join(__dirname, '../../sql/migrate-templates-components.sql'),
+    path.join(__dirname, '../../../sql/migrate-templates-components.sql'),
+  ];
+  const sqlPath = candidates.find((p) => fs.existsSync(p));
+  if (!sqlPath) return;
+
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  await pool.query(sql);
+  logger.info({ sqlPath }, 'Migraciones PostgreSQL verificadas');
 }
 
 export function getPool(): pg.Pool {

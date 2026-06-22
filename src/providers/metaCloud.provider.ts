@@ -78,12 +78,27 @@ export class MetaCloudProvider implements MessageProvider {
         type: 'header',
         parameters: [{ type: 'image', image: { link: input.headerImageUrl } }],
       });
+    } else if (input.headerTextVariables?.length) {
+      components.push({
+        type: 'header',
+        parameters: input.headerTextVariables.map((text) => ({ type: 'text', text })),
+      });
     }
     if (input.variables.length) {
       components.push({
         type: 'body',
         parameters: input.variables.map((text) => ({ type: 'text', text })),
       });
+    }
+    if (input.buttonUrlVariables?.length) {
+      for (const btn of input.buttonUrlVariables) {
+        components.push({
+          type: 'button',
+          sub_type: 'url',
+          index: String(btn.index),
+          parameters: [{ type: 'text', text: btn.text }],
+        });
+      }
     }
     return components;
   }

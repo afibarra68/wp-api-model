@@ -3,11 +3,8 @@ export interface EmissionJob {
   campaignId: string;
   clientId: string;
   telefono: string;
-  templateName: string;
-  languageCode: string;
-  templateCategory: 'marketing' | 'utility' | 'authentication';
+  templateId: string;
   variables: string[];
-  headerImageUrl?: string | null;
 }
 
 export type JobProcessor = (job: EmissionJob) => Promise<void>;

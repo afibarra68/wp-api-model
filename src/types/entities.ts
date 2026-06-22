@@ -50,14 +50,25 @@ export interface TemplateVariable {
   ejemplo?: string;
 }
 
+/** Botón de plantilla Meta (quick reply, URL o teléfono). */
+export interface TemplateButton {
+  tipo: 'quick_reply' | 'url' | 'phone';
+  texto: string;
+  url?: string | null;
+  telefono?: string | null;
+}
+
 export interface Template {
   id: string;
   nombreMeta: string;
   idioma: string;
   categoria: 'marketing' | 'utility' | 'authentication';
   estado: 'borrador' | 'pendiente' | 'aprobada' | 'rechazada';
-  headerTipo: 'none' | 'image';
+  headerTipo: 'none' | 'image' | 'text';
   headerUrl: string | null;
+  headerText: string | null;
+  footer: string | null;
+  botones: TemplateButton[];
   cuerpo: string;
   variables: TemplateVariable[];
   createdAt: Date;
