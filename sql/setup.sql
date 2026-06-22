@@ -164,6 +164,21 @@ CREATE TABLE IF NOT EXISTS conversations (
 
 CREATE INDEX IF NOT EXISTS idx_conversations_telefono ON conversations (telefono);
 
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id      UUID NOT NULL REFERENCES conversations (id) ON DELETE CASCADE,
+  direction            TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+  origen               TEXT NOT NULL CHECK (origen IN ('cliente', 'bot', 'agente', 'sistema')),
+  texto                TEXT NOT NULL,
+  whatsapp_message_id  TEXT,
+  estado               TEXT CHECK (estado IN ('enviado', 'entregado', 'leido', 'fallido')),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_messages_conversation ON conversation_messages (conversation_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_messages_wamid
+  ON conversation_messages (whatsapp_message_id) WHERE whatsapp_message_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS bot_rules (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre          TEXT NOT NULL,

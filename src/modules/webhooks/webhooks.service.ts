@@ -2,6 +2,7 @@ import { logger } from '../../core/logger';
 import * as campaignRepo from '../../repositories/campaign.repository';
 import * as clientRepo from '../../repositories/client.repository';
 import * as messageLogRepo from '../../repositories/messageLog.repository';
+import * as convMsgRepo from '../../repositories/conversationMessage.repository';
 import { EstadoMensaje, ORDEN_ESTADO } from '../../types/entities';
 import { handleInbound } from '../bot/bot.service';
 
@@ -33,6 +34,11 @@ export async function updateMessageStatus(
 ): Promise<{ updated: boolean }> {
   const log = await messageLogRepo.findMessageLogByWamid(whatsappMessageId);
   if (!log) {
+    const convUpdated = await convMsgRepo.updateConversationMessageStatusByWamid(
+      whatsappMessageId,
+      nuevoEstado,
+    );
+    if (convUpdated) return { updated: true };
     logger.warn({ whatsappMessageId }, 'Webhook de estado sin log asociado');
     return { updated: false };
   }
@@ -69,10 +75,11 @@ export async function processMetaWebhook(body: unknown): Promise<void> {
       }
 
       const messages =
-        (value.messages as Array<{ from: string; text?: { body: string }; type: string }>) ?? [];
+        (value.messages as Array<{ id: string; from: string; text?: { body: string }; type: string }>) ?? [];
       for (const m of messages) {
         const texto = m.text?.body ?? '';
-        await handleInbound(m.from, texto);
+        if (!texto && m.type !== 'text') continue;
+        await handleInbound(m.from, texto || `[${m.type}]`, m.id);
       }
     }
   }

@@ -99,17 +99,22 @@ async function runMigrations(): Promise<void> {
   `);
   if (!rows[0]?.ok) return;
 
-  const candidates = [
-    path.join(process.cwd(), 'sql/migrate-templates-components.sql'),
-    path.join(__dirname, '../../sql/migrate-templates-components.sql'),
-    path.join(__dirname, '../../../sql/migrate-templates-components.sql'),
+  const migrationFiles = [
+    'migrate-templates-components.sql',
+    'migrate-conversation-messages.sql',
   ];
-  const sqlPath = candidates.find((p) => fs.existsSync(p));
-  if (!sqlPath) return;
 
-  const sql = fs.readFileSync(sqlPath, 'utf8');
-  await pool.query(sql);
-  logger.info({ sqlPath }, 'Migraciones PostgreSQL verificadas');
+  for (const file of migrationFiles) {
+    const candidates = [
+      path.join(process.cwd(), 'sql', file),
+      path.join(__dirname, '../../sql', file),
+      path.join(__dirname, '../../../sql', file),
+    ];
+    const sqlPath = candidates.find((p) => fs.existsSync(p));
+    if (!sqlPath) continue;
+    await pool.query(fs.readFileSync(sqlPath, 'utf8'));
+    logger.info({ sqlPath }, 'Migración PostgreSQL verificada');
+  }
 }
 
 export function getPool(): pg.Pool {

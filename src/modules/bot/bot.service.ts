@@ -1,13 +1,29 @@
 import { logger } from '../../core/logger';
 import * as clientRepo from '../../repositories/client.repository';
 import * as convRepo from '../../repositories/conversation.repository';
+import * as msgRepo from '../../repositories/conversationMessage.repository';
 import { getProvider } from '../../providers';
 
 const VENTANA_MS = 24 * 60 * 60 * 1000;
 const STOP_WORDS = ['stop', 'salir', 'baja', 'cancelar'];
 const HUMANO_WORDS = ['asesor', 'humano', 'agente'];
 
-async function upsertConversation(telefono: string, texto: string) {
+async function logOutbound(
+  conversationId: string,
+  texto: string,
+  origen: 'bot' | 'sistema',
+  messageId?: string,
+) {
+  await msgRepo.insertConversationMessage({
+    conversationId,
+    direction: 'outbound',
+    origen,
+    texto,
+    whatsappMessageId: messageId ?? null,
+  });
+}
+
+async function upsertConversation(telefono: string, texto: string, whatsappMessageId?: string) {
   const client = await clientRepo.findClientByTelefono(telefono);
   if (!client) {
     logger.warn({ telefono }, 'Mensaje entrante de un número no registrado');
@@ -19,11 +35,22 @@ async function upsertConversation(telefono: string, texto: string) {
     texto,
     ventanaHasta: new Date(Date.now() + VENTANA_MS),
   });
+  await msgRepo.insertConversationMessage({
+    conversationId: conv.id,
+    direction: 'inbound',
+    origen: 'cliente',
+    texto,
+    whatsappMessageId: whatsappMessageId ?? null,
+  });
   return { client, conv };
 }
 
-export async function handleInbound(telefono: string, texto: string): Promise<{ accion: string }> {
-  const ctx = await upsertConversation(telefono, texto);
+export async function handleInbound(
+  telefono: string,
+  texto: string,
+  whatsappMessageId?: string,
+): Promise<{ accion: string }> {
+  const ctx = await upsertConversation(telefono, texto, whatsappMessageId);
   if (!ctx) return { accion: 'ignorado_no_registrado' };
 
   const provider = getProvider();
@@ -35,19 +62,17 @@ export async function handleInbound(telefono: string, texto: string): Promise<{ 
       optIn: false,
       optOutFecha: new Date(),
     });
-    await provider.sendText({
-      to: telefono,
-      text: 'Has sido dado de baja. No recibirás más mensajes. Gracias.',
-    });
+    const reply = 'Has sido dado de baja. No recibirás más mensajes. Gracias.';
+    const result = await provider.sendText({ to: telefono, text: reply });
+    await logOutbound(ctx.conv.id, reply, 'sistema', result.messageId);
     return { accion: 'opt_out' };
   }
 
   if (HUMANO_WORDS.some((w) => lower.includes(w))) {
     await convRepo.setConversationModo(ctx.conv.id, 'humano');
-    await provider.sendText({
-      to: telefono,
-      text: 'Te estamos transfiriendo con un asesor. En breve te atenderá.',
-    });
+    const reply = 'Te estamos transfiriendo con un asesor. En breve te atenderá.';
+    const result = await provider.sendText({ to: telefono, text: reply });
+    await logOutbound(ctx.conv.id, reply, 'bot', result.messageId);
     return { accion: 'handoff' };
   }
 
@@ -58,7 +83,8 @@ export async function handleInbound(telefono: string, texto: string): Promise<{ 
   const rules = await convRepo.findActiveBotRules();
   for (const rule of rules) {
     if (rule.palabrasClave.some((k) => lower.includes(k.toLowerCase()))) {
-      await provider.sendText({ to: telefono, text: rule.respuesta });
+      const result = await provider.sendText({ to: telefono, text: rule.respuesta });
+      await logOutbound(ctx.conv.id, rule.respuesta, 'bot', result.messageId);
       return { accion: `regla:${rule.nombre}` };
     }
   }

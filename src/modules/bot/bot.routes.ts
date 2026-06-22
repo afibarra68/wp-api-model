@@ -4,8 +4,10 @@ import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
 import { AppError } from '../../core/errors';
-import { serializeBotRule, serializeConversation } from '../../core/serializers';
+import { serializeBotRule, serializeConversation, serializeConversationMessage } from '../../core/serializers';
 import * as convRepo from '../../repositories/conversation.repository';
+import * as msgRepo from '../../repositories/conversationMessage.repository';
+import * as clientRepo from '../../repositories/client.repository';
 import { getProvider } from '../../providers';
 
 const router = Router();
@@ -70,8 +72,42 @@ conversationsRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const { modo } = req.query as Record<string, string>;
-    const items = await convRepo.findConversations(modo);
-    res.json(items.map(serializeConversation));
+    const items = await convRepo.findConversationsEnriched(modo);
+    res.json(
+      items.map((c) =>
+        serializeConversation(c, {
+          cliente_nombre: c.clienteNombre,
+          espera_respuesta: c.espera_respuesta,
+        }),
+      ),
+    );
+  }),
+);
+
+conversationsRouter.get(
+  '/:id/messages',
+  asyncHandler(async (req, res) => {
+    const conv = await convRepo.findConversationById(req.params.id);
+    if (!conv) throw AppError.notFound('Conversación no encontrada');
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+    const messages = await msgRepo.findMessagesByConversation(conv.id, limit);
+    res.json(messages.map(serializeConversationMessage));
+  }),
+);
+
+conversationsRouter.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const conv = await convRepo.findConversationById(req.params.id);
+    if (!conv) throw AppError.notFound('Conversación no encontrada');
+    const client = await clientRepo.findClientById(conv.clienteId);
+    const last = await msgRepo.getLastMessage(conv.id);
+    res.json(
+      serializeConversation(conv, {
+        cliente_nombre: client?.nombre ?? null,
+        espera_respuesta: last?.direction === 'inbound',
+      }),
+    );
   }),
 );
 
@@ -104,7 +140,15 @@ conversationsRouter.post(
       text: req.body.texto,
       replyToMessageId: req.body.reply_to_message_id,
     });
+    const saved = await msgRepo.insertConversationMessage({
+      conversationId: conv.id,
+      direction: 'outbound',
+      origen: 'agente',
+      texto: req.body.texto,
+      whatsappMessageId: result.messageId,
+    });
+    await convRepo.setConversationModo(conv.id, 'humano');
     await convRepo.touchConversation(conv.id);
-    res.json({ ok: true, messageId: result.messageId });
+    res.json({ ok: true, messageId: result.messageId, message: serializeConversationMessage(saved) });
   }),
 );

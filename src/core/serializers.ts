@@ -4,6 +4,7 @@ import type {
   Campaign,
   Client,
   Conversation,
+  ConversationMessage,
   MessageLog,
   Template,
   User,
@@ -92,7 +93,7 @@ export function serializeMessageLog(l: MessageLog) {
   });
 }
 
-export function serializeConversation(c: Conversation) {
+export function serializeConversation(c: Conversation, extra?: Record<string, unknown>) {
   return withMongoShape({
     id: c.id,
     cliente_id: c.clienteId,
@@ -103,6 +104,20 @@ export function serializeConversation(c: Conversation) {
     ultima_actividad: c.ultimaActividad,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
+    ...extra,
+  });
+}
+
+export function serializeConversationMessage(m: ConversationMessage) {
+  return withMongoShape({
+    id: m.id,
+    conversation_id: m.conversationId,
+    direction: m.direction,
+    origen: m.origen,
+    texto: m.texto,
+    whatsapp_message_id: m.whatsappMessageId,
+    estado: m.estado,
+    createdAt: m.createdAt,
   });
 }
 

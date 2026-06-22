@@ -141,6 +141,19 @@ export interface Conversation {
   updatedAt: Date;
 }
 
+export type ConversationMessageOrigen = 'cliente' | 'bot' | 'agente' | 'sistema';
+
+export interface ConversationMessage {
+  id: string;
+  conversationId: string;
+  direction: 'inbound' | 'outbound';
+  origen: ConversationMessageOrigen;
+  texto: string;
+  whatsappMessageId: string | null;
+  estado: 'enviado' | 'entregado' | 'leido' | 'fallido' | null;
+  createdAt: Date;
+}
+
 export interface BotRule {
   id: string;
   nombre: string;
