@@ -171,6 +171,13 @@ export interface BotRule {
   updatedAt: Date;
 }
 
+export interface BotConfig {
+  id: string;
+  mensajeCierre: string;
+  enviarMensajeCierre: boolean;
+  updatedAt: Date;
+}
+
 export interface PersonaCategoria {
   slug: string;
   nombre: string;

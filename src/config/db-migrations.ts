@@ -13,6 +13,7 @@ export const SQL_MIGRATION_FILES = [
   'migrate-personas-pagos.sql',
   'migrate-user-approval.sql',
   'migrate-admin-mfa.sql',
+  'migrate-bot-config.sql',
 ] as const;
 
 export type SqlMigrationFile = (typeof SQL_MIGRATION_FILES)[number];

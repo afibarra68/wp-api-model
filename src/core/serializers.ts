@@ -1,5 +1,6 @@
 import { toIso, withMongoShape } from '../core/apiShape';
 import type {
+  BotConfig,
   BotRule,
   Campaign,
   Client,
@@ -138,6 +139,14 @@ export function serializeBotRule(r: BotRule) {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   });
+}
+
+export function serializeBotConfig(c: BotConfig) {
+  return {
+    mensaje_cierre: c.mensajeCierre,
+    enviar_mensaje_cierre: c.enviarMensajeCierre,
+    updated_at: toIso(c.updatedAt),
+  };
 }
 
 /** Cliente en forma plana para resolveVariables (campos snake_case). */

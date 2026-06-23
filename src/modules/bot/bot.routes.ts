@@ -4,10 +4,12 @@ import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
 import { AppError } from '../../core/errors';
-import { serializeBotRule, serializeConversation, serializeConversationMessage } from '../../core/serializers';
+import { serializeBotRule, serializeBotConfig, serializeConversation, serializeConversationMessage } from '../../core/serializers';
+import * as botConfigRepo from '../../repositories/botConfig.repository';
 import * as convRepo from '../../repositories/conversation.repository';
 import * as msgRepo from '../../repositories/conversationMessage.repository';
 import * as clientRepo from '../../repositories/client.repository';
+import * as botSvc from './bot.service';
 import { getProvider } from '../../providers';
 
 const router = Router();
@@ -60,6 +62,33 @@ router.delete(
     const ok = await convRepo.deleteBotRule(req.params.id);
     if (!ok) throw AppError.notFound('Regla no encontrada');
     res.json({ ok: true });
+  }),
+);
+
+const botConfigSchema = z.object({
+  mensaje_cierre: z.string().min(1).max(2000).optional(),
+  enviar_mensaje_cierre: z.boolean().optional(),
+});
+
+router.get(
+  '/config',
+  requireRole('admin'),
+  asyncHandler(async (_req, res) => {
+    const config = await botConfigRepo.getBotConfig();
+    res.json(serializeBotConfig(config));
+  }),
+);
+
+router.patch(
+  '/config',
+  requireRole('admin'),
+  validateBody(botConfigSchema),
+  asyncHandler(async (req, res) => {
+    const config = await botConfigRepo.updateBotConfig({
+      mensajeCierre: req.body.mensaje_cierre,
+      enviarMensajeCierre: req.body.enviar_mensaje_cierre,
+    });
+    res.json(serializeBotConfig(config));
   }),
 );
 
@@ -116,6 +145,23 @@ conversationsRouter.post(
   asyncHandler(async (req, res) => {
     const conv = await convRepo.setConversationModo(req.params.id, 'humano');
     if (!conv) throw AppError.notFound('Conversación no encontrada');
+    res.json(serializeConversation(conv));
+  }),
+);
+
+const closeSchema = z.object({
+  enviar_mensaje: z.boolean().optional(),
+  texto: z.string().min(1).max(2000).optional(),
+});
+
+conversationsRouter.post(
+  '/:id/close',
+  validateBody(closeSchema),
+  asyncHandler(async (req, res) => {
+    const conv = await botSvc.closeConversation(req.params.id, {
+      enviarMensaje: req.body.enviar_mensaje,
+      texto: req.body.texto,
+    });
     res.json(serializeConversation(conv));
   }),
 );
