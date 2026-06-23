@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import pg from 'pg';
 import { env } from '../config/env';
 import { resolveMigrationPaths } from '../config/db-migrations';

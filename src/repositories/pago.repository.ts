@@ -229,7 +229,9 @@ export async function updatePago(
   }
   if (!sets.length) {
     const p = await findPagoById(id);
-    return p ? mapRow(p as EnrichedRow) : null;
+    if (!p) return null;
+    const { personaNombre: _n, personaTelefono: _t, categoriaSlug: _c, ...pago } = p;
+    return pago;
   }
   const { rows } = await getPool().query<Row>(
     `UPDATE pagos SET ${sets.join(', ')} WHERE id = $1
