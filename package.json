@@ -13,6 +13,7 @@
     "db:migrate": "tsx scripts/migrate-db.ts",
     "db:prepare-local": "npm run db:setup-local && npm run seed",
     "personas:normalize-csv": "tsx scripts/normalize-personas-csv.ts",
+    "personas:import-bundles": "tsx scripts/import-personas-bundles.ts",
     "smoke": "tsx scripts/smoke.ts",
     "test:do": "bash scripts/test-digitalocean.sh",
     "docker:up": "docker compose up -d --build",

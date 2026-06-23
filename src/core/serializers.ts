@@ -74,6 +74,26 @@ export function serializeCampaign(c: Campaign) {
       solo_activos: c.segmento.soloActivos,
     },
     mapeo_variables: c.mapeoVariables,
+    config_envio: c.configEnvio
+      ? {
+          tope_diario: c.configEnvio.topeDiario,
+          dias_estimados: c.configEnvio.diasEstimados,
+          ventana_inicio: c.configEnvio.ventanaInicio,
+          enviados_en_ventana: c.configEnvio.enviadosEnVentana,
+          intervalo_min_seg: c.configEnvio.intervaloMinSeg ?? 1,
+          intervalo_max_seg: c.configEnvio.intervaloMaxSeg ?? 10,
+        }
+      : c.configPreferencias.topeDiario ||
+          c.configPreferencias.diasPlanificados ||
+          c.configPreferencias.intervaloMinSeg ||
+          c.configPreferencias.intervaloMaxSeg
+        ? {
+            tope_diario: c.configPreferencias.topeDiario ?? null,
+            dias_planificados: c.configPreferencias.diasPlanificados ?? null,
+            intervalo_min_seg: c.configPreferencias.intervaloMinSeg ?? 1,
+            intervalo_max_seg: c.configPreferencias.intervaloMaxSeg ?? 10,
+          }
+        : null,
     estado: c.estado,
     metricas: c.metricas,
     fecha_lanzamiento: c.fechaLanzamiento,

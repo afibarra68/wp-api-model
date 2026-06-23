@@ -2,12 +2,16 @@ import { AppError } from '../../core/errors';
 import { clientForMapeo } from '../../core/serializers';
 import { renderTemplateText } from '../../core/templateSend';
 import { isValidId } from '../../core/id';
+import { env } from '../../config/env';
+import { buildConfigEnvio, calcularPlanEnvio, cupoDisponibleHoy, msHastaProximaVentana } from '../../core/campaignSchedule';
+import { normalizeIntervaloSeg } from '../../core/campaignInterval';
 import type { Client, CampaignMapeo, CampaignSegmento } from '../../types/entities';
 import * as campaignRepo from '../../repositories/campaign.repository';
 import * as clientRepo from '../../repositories/client.repository';
 import * as templateRepo from '../../repositories/template.repository';
 import * as messageLogRepo from '../../repositories/messageLog.repository';
-import { getQueue, EmissionJob } from '../../queue';
+import { getQueue } from '../../queue';
+import { releaseCampaignBatch } from './campaignScheduler';
 
 function buildSegmentFilter(segmento: CampaignSegmento | null | undefined) {
   const filter: { activo?: boolean; optIn?: boolean; etiquetas?: string[] } = {};
@@ -36,6 +40,15 @@ export function resolveVariables(client: Client, mapeo: CampaignMapeo[]): string
     });
 }
 
+function serializePlan(plan: ReturnType<typeof calcularPlanEnvio>) {
+  return {
+    tope_diario: plan.topeDiario,
+    dias_estimados: plan.diasEstimados,
+    total: plan.total,
+    mensajes_ultimo_dia: plan.mensajesUltimoDia,
+  };
+}
+
 export async function previewCampaign(campaignId: string) {
   const campaign = await campaignRepo.findCampaignById(campaignId);
   if (!campaign) throw AppError.notFound('Campaña no encontrada');
@@ -45,6 +58,8 @@ export async function previewCampaign(campaignId: string) {
   const filter = buildSegmentFilter(campaign.segmento);
   const total = await clientRepo.countClientsForSegment(filter);
   const sample = await clientRepo.findOneClientForSegment(filter);
+
+  const plan = calcularPlanEnvio(total, campaign.configPreferencias, env.campaignDefaultDias);
 
   let ejemplo: {
     variables: string[];
@@ -71,6 +86,7 @@ export async function previewCampaign(campaignId: string) {
     campania: campaign.nombreCampana,
     plantilla: template.nombreMeta,
     total_destinatarios: total,
+    plan_envio: serializePlan(plan),
     banner: template.headerTipo === 'image' ? template.headerUrl : null,
     titulo: template.headerTipo === 'text' ? template.headerText : null,
     footer: template.footer,
@@ -98,7 +114,18 @@ export async function launchCampaign(campaignId: string) {
     throw AppError.badRequest('No hay clientes que coincidan con el segmento');
   }
 
-  const logs = await messageLogRepo.insertMessageLogs(
+  const plan = calcularPlanEnvio(clientes.length, campaign.configPreferencias, env.campaignDefaultDias);
+  const { min, max } = normalizeIntervaloSeg(
+    campaign.configPreferencias.intervaloMinSeg,
+    campaign.configPreferencias.intervaloMaxSeg,
+  );
+  const configEnvio = {
+    ...buildConfigEnvio(plan, new Date()),
+    intervaloMinSeg: min,
+    intervaloMaxSeg: max,
+  };
+
+  await messageLogRepo.insertMessageLogs(
     clientes.map((c) => ({
       campanaId: campaign.id,
       clienteId: c.id,
@@ -106,25 +133,26 @@ export async function launchCampaign(campaignId: string) {
     })),
   );
 
-  const queue = getQueue();
-  const jobs: EmissionJob[] = clientes.map((c, idx) => ({
-    logId: logs[idx].id,
-    campaignId: campaign.id,
-    clientId: c.id,
-    telefono: c.telefono,
-    templateId: template.id,
-    variables: resolveVariables(c, campaign.mapeoVariables),
-  }));
-
   await campaignRepo.updateCampaign(campaign.id, {
     estado: 'en_progreso',
     fechaLanzamiento: new Date(),
-    metricas: { total: clientes.length, encolados: clientes.length },
+    configEnvio,
+    metricas: {
+      total: clientes.length,
+      encolados: 0,
+      pendientes: clientes.length,
+    },
   });
 
-  await queue.addBulk(jobs);
+  const liberados = await releaseCampaignBatch(campaign.id);
 
-  return { encolados: jobs.length, campana_id: campaign.id, estado: 'en_progreso' };
+  return {
+    encolados: liberados,
+    pendientes: clientes.length - liberados,
+    campana_id: campaign.id,
+    estado: 'en_progreso',
+    plan_envio: serializePlan(plan),
+  };
 }
 
 export async function pauseCampaign(campaignId: string) {
@@ -135,11 +163,22 @@ export async function pauseCampaign(campaignId: string) {
   return updated;
 }
 
+export async function deleteCampaign(campaignId: string): Promise<void> {
+  const campaign = await campaignRepo.findCampaignById(campaignId);
+  if (!campaign) throw AppError.notFound('Campaña no encontrada');
+  if (campaign.estado === 'en_progreso') {
+    throw AppError.conflict('Pausa la campaña antes de eliminarla');
+  }
+  const ok = await campaignRepo.deleteCampaign(campaignId);
+  if (!ok) throw AppError.notFound('Campaña no encontrada');
+}
+
 export async function resumeCampaign(campaignId: string) {
   const campaign = await campaignRepo.findCampaignById(campaignId);
   if (!campaign) throw AppError.notFound('Campaña no encontrada');
   await getQueue().resume();
   const updated = await campaignRepo.updateCampaign(campaignId, { estado: 'en_progreso' });
+  await releaseCampaignBatch(campaignId);
   return updated;
 }
 
@@ -150,10 +189,21 @@ export async function campaignReport(campaignId: string) {
   const m = campaign.metricas;
   const pct = (n: number) => (m.total > 0 ? Math.round((n / m.total) * 1000) / 10 : 0);
 
+  const planEnvio = campaign.configEnvio
+    ? {
+        tope_diario: campaign.configEnvio.topeDiario,
+        dias_estimados: campaign.configEnvio.diasEstimados,
+        enviados_hoy: campaign.configEnvio.enviadosEnVentana,
+        ms_hasta_proxima_ventana: msHastaProximaVentana(campaign.configEnvio),
+        cupo_restante_hoy: cupoDisponibleHoy(campaign.configEnvio).cupo,
+      }
+    : null;
+
   return {
     campana: campaign.nombreCampana,
     estado: campaign.estado,
     metricas: m,
+    plan_envio: planEnvio,
     porcentajes: {
       enviados: pct(m.enviados),
       entregados: pct(m.entregados),

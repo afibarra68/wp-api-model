@@ -1,4 +1,5 @@
 export const ESTADOS_MENSAJE = [
+  'pendiente',
   'encolado',
   'enviado',
   'entregado',
@@ -9,6 +10,7 @@ export const ESTADOS_MENSAJE = [
 export type EstadoMensaje = (typeof ESTADOS_MENSAJE)[number];
 
 export const ORDEN_ESTADO: Record<EstadoMensaje, number> = {
+  pendiente: -1,
   encolado: 0,
   enviado: 1,
   entregado: 2,
@@ -98,6 +100,24 @@ export interface CampaignMetricas {
   entregados: number;
   leidos: number;
   fallidos: number;
+  pendientes?: number;
+}
+
+/** Dosificación diaria: tope por ventana de 24 h desde ventana_inicio. */
+export interface CampaignConfigEnvio {
+  topeDiario: number;
+  diasEstimados: number;
+  ventanaInicio: Date | null;
+  enviadosEnVentana: number;
+  intervaloMinSeg?: number;
+  intervaloMaxSeg?: number;
+}
+
+export interface CampaignPlanEnvio {
+  topeDiario: number;
+  diasEstimados: number;
+  total: number;
+  mensajesUltimoDia: number;
 }
 
 export interface Campaign {
@@ -107,6 +127,13 @@ export interface Campaign {
   integrationId: string | null;
   segmento: CampaignSegmento;
   mapeoVariables: CampaignMapeo[];
+  configEnvio: CampaignConfigEnvio | null;
+  configPreferencias: {
+    topeDiario?: number;
+    diasPlanificados?: number;
+    intervaloMinSeg?: number;
+    intervaloMaxSeg?: number;
+  };
   estado: 'borrador' | 'en_progreso' | 'pausada' | 'finalizada' | 'error';
   metricas: CampaignMetricas;
   fechaLanzamiento: Date | null;

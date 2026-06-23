@@ -3,10 +3,11 @@ import { env } from '../../config/env';
 import { asyncHandler } from '../../middlewares/asyncHandler';
 import { DbQueue } from '../../queue/db.queue';
 import { getQueue } from '../../queue';
+import { releaseAllCampaignBatches } from '../campaigns/campaignScheduler';
 
 const router = Router();
 
-/** Cron de Vercel: procesa mensajes encolados en MongoDB. */
+/** Cron: procesa mensajes encolados y libera lotes diarios de campañas. */
 router.get(
   '/process-queue',
   asyncHandler(async (req, res) => {
@@ -18,13 +19,14 @@ router.get(
     }
 
     const queue = getQueue();
-    if (!(queue instanceof DbQueue)) {
-      return res.json({ processed: 0, queue: queue.name, note: 'Cola no basada en DB' });
+    let processed = 0;
+    if (queue instanceof DbQueue) {
+      const batchSize = Math.max(1, env.sendRatePerSecond * 55);
+      processed = await queue.runBatch(batchSize);
     }
 
-    const batchSize = Math.max(1, env.sendRatePerSecond * 55);
-    const processed = await queue.runBatch(batchSize);
-    res.json({ processed, queue: queue.name });
+    const released = await releaseAllCampaignBatches();
+    res.json({ processed, released, queue: queue.name });
   }),
 );
 

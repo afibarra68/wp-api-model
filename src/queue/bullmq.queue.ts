@@ -40,6 +40,7 @@ export class BullMqQueue implements MessageQueue {
 
   async add(job: EmissionJob): Promise<void> {
     await this.queue.add('envio', job, {
+      delay: job.delayMs ?? 0,
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
       removeOnComplete: 1000,
@@ -53,6 +54,7 @@ export class BullMqQueue implements MessageQueue {
         name: 'envio',
         data,
         opts: {
+          delay: data.delayMs ?? 0,
           attempts: 3,
           backoff: { type: 'exponential' as const, delay: 2000 },
           removeOnComplete: 1000,

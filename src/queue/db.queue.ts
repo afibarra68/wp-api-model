@@ -1,10 +1,9 @@
-import { env } from '../config/env';
+import { getIntervalFromConfig, randomDelayMs, sleep } from '../core/campaignInterval';
 import { logger } from '../core/logger';
+import * as campaignRepo from '../repositories/campaign.repository';
 import * as messageLogRepo from '../repositories/messageLog.repository';
 import { buildJobFromLog, processEmissionJob } from './emission.processor';
 import { EmissionJob, JobProcessor, MessageQueue } from './queue.interface';
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Cola respaldada por PostgreSQL (message_logs en estado "encolado").
@@ -14,12 +13,6 @@ export class DbQueue implements MessageQueue {
   readonly name = 'db';
   private processor: JobProcessor = processEmissionJob;
   private paused = false;
-  private readonly intervalMs: number;
-
-  constructor() {
-    const rate = Math.max(1, env.sendRatePerSecond);
-    this.intervalMs = Math.floor(1000 / rate);
-  }
 
   process(processor: JobProcessor): void {
     this.processor = processor;
@@ -51,9 +44,13 @@ export class DbQueue implements MessageQueue {
         logger.warn({ logId: log.id }, 'No se pudo reconstruir job de emisión');
         continue;
       }
+      if (processed > 0) {
+        const campaign = await campaignRepo.findCampaignById(log.campanaId);
+        const { min, max } = getIntervalFromConfig(campaign?.configEnvio ?? null);
+        await sleep(randomDelayMs(min, max));
+      }
       await this.processor(job);
       processed++;
-      if (this.intervalMs > 0) await sleep(this.intervalMs);
     }
     return processed;
   }

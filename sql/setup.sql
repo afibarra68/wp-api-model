@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   estado              TEXT NOT NULL DEFAULT 'borrador'
     CHECK (estado IN ('borrador', 'en_progreso', 'pausada', 'finalizada', 'error')),
   metricas            JSONB NOT NULL DEFAULT '{"total":0,"encolados":0,"enviados":0,"entregados":0,"leidos":0,"fallidos":0}',
+  config_envio        JSONB NOT NULL DEFAULT '{}',
   fecha_lanzamiento   TIMESTAMPTZ,
   fecha_finalizacion  TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -137,8 +138,8 @@ CREATE TABLE IF NOT EXISTS message_logs (
     meta_message_status IS NULL
     OR meta_message_status IN ('accepted', 'held_for_quality_assessment', 'paused')
   ),
-  estado_actual         TEXT NOT NULL DEFAULT 'encolado'
-    CHECK (estado_actual IN ('encolado', 'enviado', 'entregado', 'leido', 'fallido')),
+  estado_actual         TEXT NOT NULL DEFAULT 'pendiente'
+    CHECK (estado_actual IN ('pendiente', 'encolado', 'enviado', 'entregado', 'leido', 'fallido')),
   error                 TEXT,
   historial_estados     JSONB NOT NULL DEFAULT '[]',
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

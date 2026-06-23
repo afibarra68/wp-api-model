@@ -5,6 +5,8 @@ export interface EmissionJob {
   telefono: string;
   templateId: string;
   variables: string[];
+  /** Espera en ms antes de procesar este mensaje (dosificación por campaña). */
+  delayMs?: number;
 }
 
 export type JobProcessor = (job: EmissionJob) => Promise<void>;

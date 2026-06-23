@@ -29,6 +29,14 @@ const createSchema = z.object({
     })
     .default({ solo_activos: true }),
   mapeo_variables: z.array(mapeoSchema).default([]),
+  config_envio: z
+    .object({
+      tope_diario: z.number().int().positive().optional(),
+      dias_planificados: z.number().int().positive().optional(),
+      intervalo_min_seg: z.number().int().min(1).max(10).optional(),
+      intervalo_max_seg: z.number().int().min(1).max(10).optional(),
+    })
+    .optional(),
 });
 
 router.get(
@@ -88,6 +96,15 @@ router.post(
   asyncHandler(async (req, res) => {
     const c = await svc.resumeCampaign(req.params.id);
     res.json(serializeCampaign(c!));
+  }),
+);
+
+router.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    if (!svc.isValidId(req.params.id)) throw AppError.badRequest('ID inválido');
+    await svc.deleteCampaign(req.params.id);
+    res.json({ ok: true });
   }),
 );
 

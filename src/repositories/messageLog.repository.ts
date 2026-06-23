@@ -81,7 +81,15 @@ export async function findMessageLogByWamid(wamid: string): Promise<MessageLog |
 
 export async function countPendingLogs(campaignId: string): Promise<number> {
   const { rows } = await getPool().query<{ c: string }>(
-    `SELECT COUNT(*)::text AS c FROM message_logs WHERE campana_id = $1 AND estado_actual = 'encolado'`,
+    `SELECT COUNT(*)::text AS c FROM message_logs WHERE campana_id = $1 AND estado_actual IN ('encolado', 'pendiente')`,
+    [campaignId],
+  );
+  return Number(rows[0]?.c ?? 0);
+}
+
+export async function countPendienteLogs(campaignId: string): Promise<number> {
+  const { rows } = await getPool().query<{ c: string }>(
+    `SELECT COUNT(*)::text AS c FROM message_logs WHERE campana_id = $1 AND estado_actual = 'pendiente'`,
     [campaignId],
   );
   return Number(rows[0]?.c ?? 0);
@@ -98,13 +106,13 @@ export async function insertMessageLogs(
   const pool = getPool();
   const client = await pool.connect();
   const created: MessageLog[] = [];
-  const historial = JSON.stringify([{ estado: 'encolado', fecha: new Date().toISOString() }]);
+  const historial = JSON.stringify([{ estado: 'pendiente', fecha: new Date().toISOString() }]);
   try {
     await client.query('BEGIN');
     for (const l of logs) {
       const { rows } = await client.query<Row>(
         `INSERT INTO message_logs (campana_id, cliente_id, telefono, estado_actual, historial_estados)
-         VALUES ($1,$2,$3,'encolado',$4::jsonb) RETURNING ${FIELDS}`,
+         VALUES ($1,$2,$3,'pendiente',$4::jsonb) RETURNING ${FIELDS}`,
         [l.campanaId, l.clienteId, l.telefono, historial],
       );
       created.push(mapRow(rows[0]));
@@ -163,6 +171,27 @@ export async function findQueuedLogs(limit: number): Promise<MessageLog[]> {
     `SELECT ${FIELDS} FROM message_logs WHERE estado_actual = 'encolado'
      ORDER BY created_at ASC LIMIT $1`,
     [limit],
+  );
+  return rows.map(mapRow);
+}
+
+/** Pasa mensajes de pendiente → encolado (hasta `limit`) para una campaña. */
+export async function releasePendingLogs(campaignId: string, limit: number): Promise<MessageLog[]> {
+  if (limit <= 0) return [];
+  const entry = JSON.stringify([{ estado: 'encolado', fecha: new Date().toISOString() }]);
+  const { rows } = await getPool().query<Row>(
+    `UPDATE message_logs SET
+      estado_actual = 'encolado',
+      historial_estados = historial_estados || $3::jsonb
+     WHERE id IN (
+       SELECT id FROM message_logs
+       WHERE campana_id = $1 AND estado_actual = 'pendiente'
+       ORDER BY created_at ASC
+       LIMIT $2
+       FOR UPDATE SKIP LOCKED
+     )
+     RETURNING ${FIELDS}`,
+    [campaignId, limit, entry],
   );
   return rows.map(mapRow);
 }

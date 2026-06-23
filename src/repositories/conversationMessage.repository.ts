@@ -88,7 +88,7 @@ export async function updateConversationMessageStatusByWamid(
   whatsappMessageId: string,
   nuevoEstado: EstadoMensaje,
 ): Promise<boolean> {
-  if (nuevoEstado === 'encolado') return false;
+  if (nuevoEstado === 'encolado' || nuevoEstado === 'pendiente') return false;
   const msg = await findConversationMessageByWamid(whatsappMessageId);
   if (!msg || msg.direction !== 'outbound') return false;
 

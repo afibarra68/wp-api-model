@@ -51,6 +51,8 @@ export const env = {
   cronSecret: str('CRON_SECRET'),
   redisUrl: str('REDIS_URL', 'redis://localhost:6379'),
   sendRatePerSecond: num('SEND_RATE_PER_SECOND', 2),
+  /** Días por defecto para repartir una campaña si no se indica tope ni duración. */
+  campaignDefaultDias: num('CAMPAIGN_DEFAULT_DIAS', 7),
 
   jwtSecret: str('JWT_SECRET', 'dev-secret-change-me'),
   jwtRefreshSecret: str('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
