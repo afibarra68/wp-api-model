@@ -1,8 +1,11 @@
 import { logger } from '../../core/logger';
+import { AppError } from '../../core/errors';
+import * as botConfigRepo from '../../repositories/botConfig.repository';
 import * as clientRepo from '../../repositories/client.repository';
 import * as convRepo from '../../repositories/conversation.repository';
 import * as msgRepo from '../../repositories/conversationMessage.repository';
 import { getProvider } from '../../providers';
+import type { Conversation } from '../../types/entities';
 
 const VENTANA_MS = 24 * 60 * 60 * 1000;
 const STOP_WORDS = ['stop', 'salir', 'baja', 'cancelar'];
@@ -24,9 +27,9 @@ async function logOutbound(
 }
 
 async function upsertConversation(telefono: string, texto: string, whatsappMessageId?: string) {
-  const client = await clientRepo.findClientByTelefono(telefono);
+  const client = await clientRepo.findOrCreateClientFromInbound(telefono);
   if (!client) {
-    logger.warn({ telefono }, 'Mensaje entrante de un número no registrado');
+    logger.warn({ telefono }, 'Mensaje entrante con teléfono inválido');
     return null;
   }
   const conv = await convRepo.upsertConversation({
@@ -51,7 +54,7 @@ export async function handleInbound(
   whatsappMessageId?: string,
 ): Promise<{ accion: string }> {
   const ctx = await upsertConversation(telefono, texto, whatsappMessageId);
-  if (!ctx) return { accion: 'ignorado_no_registrado' };
+  if (!ctx) return { accion: 'ignorado_telefono_invalido' };
 
   const provider = getProvider();
   const lower = texto.trim().toLowerCase();
@@ -90,4 +93,31 @@ export async function handleInbound(
   }
 
   return { accion: 'sin_coincidencia' };
+}
+
+export async function closeConversation(
+  conversationId: string,
+  options?: { enviarMensaje?: boolean; texto?: string },
+): Promise<Conversation> {
+  const conv = await convRepo.findConversationById(conversationId);
+  if (!conv) throw AppError.notFound('Conversación no encontrada');
+
+  const config = await botConfigRepo.getBotConfig();
+  const shouldSend = options?.enviarMensaje ?? config.enviarMensajeCierre;
+  const texto = options?.texto?.trim() || config.mensajeCierre;
+
+  if (shouldSend && texto) {
+    const abierta = conv.ventanaAbiertaHasta && conv.ventanaAbiertaHasta > new Date();
+    if (abierta) {
+      const result = await getProvider().sendText({ to: conv.telefono, text: texto });
+      await logOutbound(conv.id, texto, 'sistema', result.messageId);
+    } else {
+      await logOutbound(conv.id, `${texto} (no enviado: ventana 24h cerrada)`, 'sistema');
+    }
+  }
+
+  const updated = await convRepo.setConversationModo(conversationId, 'bot');
+  if (!updated) throw AppError.notFound('Conversación no encontrada');
+  await convRepo.touchConversation(conversationId);
+  return updated;
 }

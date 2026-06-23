@@ -1,4 +1,5 @@
 import { getPool } from '../core/postgres';
+import { normalizePhone } from '../core/phone';
 import type { Client } from '../types/entities';
 
 type Row = {
@@ -89,10 +90,49 @@ export async function findClientById(id: string): Promise<Client | null> {
 }
 
 export async function findClientByTelefono(telefono: string): Promise<Client | null> {
-  const { rows } = await getPool().query<Row>(`SELECT ${FIELDS} FROM clients WHERE telefono = $1`, [
-    telefono,
-  ]);
+  const digits = telefono.replace(/\D/g, '');
+  if (!digits) return null;
+  const { rows } = await getPool().query<Row>(
+    `SELECT ${FIELDS} FROM clients
+     WHERE telefono = $1 OR regexp_replace(telefono, '\\D', '', 'g') = $2
+     LIMIT 1`,
+    [telefono, digits],
+  );
   return rows[0] ? mapRow(rows[0]) : null;
+}
+
+/** Crea cliente si un número nuevo escribe por WhatsApp (opt-in implícito al escribir). */
+export async function findOrCreateClientFromInbound(rawTelefono: string): Promise<Client | null> {
+  const telefono = normalizePhone(rawTelefono);
+  if (!telefono) return null;
+
+  const existing = await findClientByTelefono(telefono);
+  if (existing) {
+    if (!existing.activo || !existing.optIn) {
+      return (
+        (await updateClient(existing.id, {
+          activo: true,
+          optIn: true,
+          optOutFecha: null,
+        })) ?? existing
+      );
+    }
+    return existing;
+  }
+
+  try {
+    return await createClient({
+      nombre: `Contacto ${telefono}`,
+      telefono,
+      optIn: true,
+      etiquetas: ['whatsapp-inbound'],
+      metadata: { origen: 'whatsapp_inbound', auto_creado: true },
+    });
+  } catch (e: unknown) {
+    const code = (e as { code?: string }).code;
+    if (code === '23505') return findClientByTelefono(telefono);
+    throw e;
+  }
 }
 
 export async function findClientsForSegment(filter: {
