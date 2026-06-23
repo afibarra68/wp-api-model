@@ -18,6 +18,8 @@ export const ORDEN_ESTADO: Record<EstadoMensaje, number> = {
 
 export type Role = 'admin' | 'operador' | 'agente';
 
+export type UserApprovalStatus = 'pendiente' | 'aprobado' | 'rechazado';
+
 export interface User {
   id: string;
   nombre: string;
@@ -25,6 +27,9 @@ export interface User {
   passwordHash?: string;
   rol: Role;
   activo: boolean;
+  estadoAprobacion: UserApprovalStatus;
+  mfaEnabled: boolean;
+  totpSecret?: string | null;
   ultimoLogin: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -163,5 +168,56 @@ export interface BotRule {
   activo: boolean;
   prioridad: number;
   createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PersonaCategoria {
+  slug: string;
+  nombre: string;
+  descripcion: string | null;
+  color: string | null;
+  activo: boolean;
+  orden: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Persona {
+  id: string;
+  nombre: string;
+  telefono: string;
+  categoriaSlug: string;
+  activo: boolean;
+  notas: string | null;
+  metadata: Record<string, unknown>;
+  origen: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type PagoEstado = 'pendiente' | 'pagado' | 'cancelado';
+
+export interface Pago {
+  id: string;
+  personaId: string;
+  estado: PagoEstado;
+  monto: number | null;
+  moneda: string;
+  concepto: string | null;
+  fechaVencimiento: Date | null;
+  fechaPago: Date | null;
+  referencia: string | null;
+  notas: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PersonasConfig {
+  id: string;
+  defaultCountryCode: string;
+  autoPagoPendiente: boolean;
+  categoriaPendientesSlug: string;
+  syncToClients: boolean;
   updatedAt: Date;
 }

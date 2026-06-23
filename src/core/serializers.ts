@@ -6,6 +6,10 @@ import type {
   Conversation,
   ConversationMessage,
   MessageLog,
+  Pago,
+  Persona,
+  PersonaCategoria,
+  PersonasConfig,
   Template,
   User,
 } from '../types/entities';
@@ -17,6 +21,7 @@ export function serializeUser(u: User) {
     email: u.email,
     rol: u.rol,
     activo: u.activo,
+    estado_aprobacion: u.estadoAprobacion,
     ultimo_login: u.ultimoLogin,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
@@ -144,6 +149,68 @@ export function clientForMapeo(c: Client): Record<string, unknown> {
     opt_in: c.optIn,
     metadata: c.metadata,
   };
+}
+
+export function serializePersonaCategoria(c: PersonaCategoria) {
+  return withMongoShape({
+    id: c.slug,
+    slug: c.slug,
+    nombre: c.nombre,
+    descripcion: c.descripcion,
+    color: c.color,
+    activo: c.activo,
+    orden: c.orden,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  });
+}
+
+export function serializePersona(p: Persona) {
+  return withMongoShape({
+    id: p.id,
+    nombre: p.nombre,
+    telefono: p.telefono,
+    categoria_slug: p.categoriaSlug,
+    activo: p.activo,
+    notas: p.notas,
+    metadata: p.metadata,
+    origen: p.origen,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  });
+}
+
+export function serializePersonasConfig(c: PersonasConfig) {
+  return {
+    default_country_code: c.defaultCountryCode,
+    auto_pago_pendiente: c.autoPagoPendiente,
+    categoria_pendientes_slug: c.categoriaPendientesSlug,
+    sync_to_clients: c.syncToClients,
+    updated_at: toIso(c.updatedAt),
+  };
+}
+
+export function serializePago(
+  p: Pago & { personaNombre?: string; personaTelefono?: string; categoriaSlug?: string },
+) {
+  return withMongoShape({
+    id: p.id,
+    persona_id: p.personaId,
+    estado: p.estado,
+    monto: p.monto,
+    moneda: p.moneda,
+    concepto: p.concepto,
+    fecha_vencimiento: p.fechaVencimiento,
+    fecha_pago: p.fechaPago,
+    referencia: p.referencia,
+    notas: p.notas,
+    metadata: p.metadata,
+    persona_nombre: p.personaNombre ?? null,
+    persona_telefono: p.personaTelefono ?? null,
+    categoria_slug: p.categoriaSlug ?? null,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  });
 }
 
 export { toIso };

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import pg from 'pg';
 import { env } from '../config/env';
+import { resolveMigrationPaths } from '../config/db-migrations';
 import { logger } from './logger';
 
 const { Pool } = pg;
@@ -99,19 +99,7 @@ async function runMigrations(): Promise<void> {
   `);
   if (!rows[0]?.ok) return;
 
-  const migrationFiles = [
-    'migrate-templates-components.sql',
-    'migrate-conversation-messages.sql',
-  ];
-
-  for (const file of migrationFiles) {
-    const candidates = [
-      path.join(process.cwd(), 'sql', file),
-      path.join(__dirname, '../../sql', file),
-      path.join(__dirname, '../../../sql', file),
-    ];
-    const sqlPath = candidates.find((p) => fs.existsSync(p));
-    if (!sqlPath) continue;
+  for (const sqlPath of resolveMigrationPaths()) {
     await pool.query(fs.readFileSync(sqlPath, 'utf8'));
     logger.info({ sqlPath }, 'Migración PostgreSQL verificada');
   }

@@ -60,7 +60,7 @@ export const env = {
 
   seedAdminEmail: str('SEED_ADMIN_EMAIL', 'admin@local.test'),
   seedAdminPassword: str('SEED_ADMIN_PASSWORD', 'Cambiar.Esto.123'),
-  seedMockups: str('SEED_MOCKUPS', 'true') === 'true',
+  seedMockups: str('SEED_MOCKUPS', 'false') === 'true',
 
   provider: str('PROVIDER', 'simulation') as 'simulation' | 'meta-cloud' | 'evolution',
 
