@@ -51,11 +51,23 @@ router.post(
   }),
 );
 
+const optionalInt = (min: number, max: number) =>
+  z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+    z.number().int().min(min).max(max).optional(),
+  );
+
 const settingsSchema = z.object({
-  send_rate_per_second: z.number().int().min(1).max(50).optional(),
-  release_batch_size: z.number().int().min(1).max(500).optional(),
-  product_policy: z.enum(['CLOUD_API_FALLBACK', 'STRICT']).nullable().optional(),
-  message_activity_sharing: z.boolean().nullable().optional(),
+  send_rate_per_second: optionalInt(1, 50),
+  release_batch_size: optionalInt(1, 500),
+  product_policy: z.preprocess(
+    (v) => (v === '' || v === undefined ? null : v),
+    z.enum(['CLOUD_API_FALLBACK', 'STRICT']).nullable().optional(),
+  ),
+  message_activity_sharing: z.preprocess(
+    (v) => (v === '' || v === undefined ? null : v),
+    z.boolean().nullable().optional(),
+  ),
 });
 
 router.get(

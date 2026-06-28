@@ -30,12 +30,27 @@ function mergeVariableNames(
   });
 }
 
+function emptyToNull(value: unknown): unknown {
+  if (value === '' || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  return value;
+}
+
+const optionalUrl = z.preprocess(
+  emptyToNull,
+  z.string().url().nullable().optional(),
+);
+
+const headerTipoSchema = z.enum(['none', 'text', 'image']);
+const optionalHeaderText = z.preprocess(emptyToNull, z.string().min(1).nullable().optional());
+
 const createSchema = z.object({
   nombre_meta: z.string().min(1),
   idioma: z.string().min(2).default('es'),
   categoria: z.enum(['marketing', 'utility', 'authentication']).default('utility'),
-  header_tipo: z.enum(['none', 'image']).default('none'),
-  header_url: z.string().url().nullable().optional(),
+  header_tipo: headerTipoSchema.default('none'),
+  header_url: optionalUrl,
+  header_text: optionalHeaderText,
   cuerpo: z.string().min(1),
   variables: z.array(variableSchema).default([]),
 });
@@ -44,8 +59,9 @@ const updateSchema = z.object({
   estado: z.enum(['borrador', 'pendiente', 'aprobada', 'rechazada']).optional(),
   cuerpo: z.string().min(1).optional(),
   categoria: z.enum(['marketing', 'utility', 'authentication']).optional(),
-  header_tipo: z.enum(['none', 'image']).optional(),
-  header_url: z.string().url().nullable().optional(),
+  header_tipo: headerTipoSchema.optional(),
+  header_url: optionalUrl,
+  header_text: optionalHeaderText,
   variables: z.array(variableSchema).optional(),
 });
 

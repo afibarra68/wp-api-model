@@ -6,7 +6,7 @@ type Schema = ZodTypeAny;
 /** Valida req.body contra un esquema Zod y reemplaza el body por el valor parseado. */
 export function validateBody(schema: Schema) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    const result = schema.safeParse(req.body ?? {});
     if (!result.success) return next(result.error);
     req.body = result.data;
     next();

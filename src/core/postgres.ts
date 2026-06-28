@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
 import { env } from '../config/env';
+import { resolveMigrationPaths } from '../config/db-migrations';
 import { logger } from './logger';
 
 const { Pool } = pg;
@@ -54,48 +55,9 @@ export async function connectPostgres(): Promise<void> {
     await client.query('SELECT 1');
     logger.info('PostgreSQL conectado');
     await ensureSchema();
-    await ensureMigrations();
+    await runMigrations();
   } finally {
     client.release();
-  }
-}
-
-function resolveSqlPath(filename: string): string | undefined {
-  const candidates = [
-    path.join(process.cwd(), 'sql', filename),
-    path.join(__dirname, '../../sql', filename),
-    path.join(__dirname, '../../../sql', filename),
-  ];
-  return candidates.find((p) => fs.existsSync(p));
-}
-
-/** Migraciones incrementales para bases ya existentes en producción. */
-async function ensureMigrations(): Promise<void> {
-  if (!pool) return;
-
-  const pending: { table: string; file: string }[] = [
-    { table: 'campaign_settings', file: 'migrate-campaign-settings.sql' },
-  ];
-
-  for (const { table, file } of pending) {
-    const { rows } = await pool.query<{ ok: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM information_schema.tables
-         WHERE table_schema = 'public' AND table_name = $1
-       ) AS ok`,
-      [table],
-    );
-    if (rows[0]?.ok) continue;
-
-    const sqlPath = resolveSqlPath(file);
-    if (!sqlPath) {
-      logger.warn({ file }, 'Archivo de migración no encontrado');
-      continue;
-    }
-
-    const sql = fs.readFileSync(sqlPath, 'utf8');
-    await pool.query(sql);
-    logger.info({ sqlPath, table }, 'Migración PostgreSQL aplicada');
   }
 }
 
@@ -110,7 +72,12 @@ async function ensureSchema(): Promise<void> {
   `);
   if (rows[0]?.ok) return;
 
-  const sqlPath = resolveSqlPath('setup.sql');
+  const candidates = [
+    path.join(process.cwd(), 'sql/setup.sql'),
+    path.join(__dirname, '../../sql/setup.sql'),
+    path.join(__dirname, '../../../sql/setup.sql'),
+  ];
+  const sqlPath = candidates.find((p) => fs.existsSync(p));
   if (!sqlPath) {
     logger.warn('sql/setup.sql no encontrado — ejecute npm run db:setup manualmente');
     return;
@@ -119,6 +86,24 @@ async function ensureSchema(): Promise<void> {
   const sql = fs.readFileSync(sqlPath, 'utf8');
   await pool.query(sql);
   logger.info({ sqlPath }, 'Schema PostgreSQL aplicado (setup.sql)');
+}
+
+/** Migraciones incrementales idempotentes (solo agregan lo que falta). */
+async function runMigrations(): Promise<void> {
+  if (!pool) return;
+
+  const { rows } = await pool.query<{ ok: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'templates'
+    ) AS ok
+  `);
+  if (!rows[0]?.ok) return;
+
+  for (const sqlPath of resolveMigrationPaths()) {
+    await pool.query(fs.readFileSync(sqlPath, 'utf8'));
+    logger.info({ sqlPath }, 'Migración PostgreSQL verificada');
+  }
 }
 
 export function getPool(): pg.Pool {

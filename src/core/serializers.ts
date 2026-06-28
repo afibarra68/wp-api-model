@@ -1,11 +1,17 @@
 import { toIso, withMongoShape } from '../core/apiShape';
 import type {
+  BotConfig,
   BotRule,
   Campaign,
   CampaignSettings,
   Client,
   Conversation,
+  ConversationMessage,
   MessageLog,
+  Pago,
+  Persona,
+  PersonaCategoria,
+  PersonasConfig,
   Template,
   User,
 } from '../types/entities';
@@ -17,6 +23,7 @@ export function serializeUser(u: User) {
     email: u.email,
     rol: u.rol,
     activo: u.activo,
+    estado_aprobacion: u.estadoAprobacion,
     ultimo_login: u.ultimoLogin,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
@@ -48,6 +55,7 @@ export function serializeTemplate(t: Template) {
     estado: t.estado,
     header_tipo: t.headerTipo,
     header_url: t.headerUrl,
+    header_text: t.headerText,
     cuerpo: t.cuerpo,
     variables: t.variables,
     createdAt: t.createdAt,
@@ -100,7 +108,7 @@ export function serializeMessageLog(l: MessageLog) {
   });
 }
 
-export function serializeConversation(c: Conversation) {
+export function serializeConversation(c: Conversation, extra?: Record<string, unknown>) {
   return withMongoShape({
     id: c.id,
     cliente_id: c.clienteId,
@@ -111,6 +119,20 @@ export function serializeConversation(c: Conversation) {
     ultima_actividad: c.ultimaActividad,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
+    ...extra,
+  });
+}
+
+export function serializeConversationMessage(m: ConversationMessage) {
+  return withMongoShape({
+    id: m.id,
+    conversation_id: m.conversationId,
+    direction: m.direction,
+    origen: m.origen,
+    texto: m.texto,
+    whatsapp_message_id: m.whatsappMessageId,
+    estado: m.estado,
+    createdAt: m.createdAt,
   });
 }
 
@@ -125,6 +147,76 @@ export function serializeBotRule(r: BotRule) {
     prioridad: r.prioridad,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+  });
+}
+
+export function serializeBotConfig(c: BotConfig) {
+  return {
+    mensaje_cierre: c.mensajeCierre,
+    enviar_mensaje_cierre: c.enviarMensajeCierre,
+    updated_at: toIso(c.updatedAt),
+  };
+}
+
+export function serializePersonaCategoria(c: PersonaCategoria) {
+  return withMongoShape({
+    id: c.slug,
+    slug: c.slug,
+    nombre: c.nombre,
+    descripcion: c.descripcion,
+    color: c.color,
+    activo: c.activo,
+    orden: c.orden,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  });
+}
+
+export function serializePersona(p: Persona) {
+  return withMongoShape({
+    id: p.id,
+    nombre: p.nombre,
+    telefono: p.telefono,
+    categoria_slug: p.categoriaSlug,
+    activo: p.activo,
+    notas: p.notas,
+    metadata: p.metadata,
+    origen: p.origen,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  });
+}
+
+export function serializePersonasConfig(c: PersonasConfig) {
+  return {
+    default_country_code: c.defaultCountryCode,
+    auto_pago_pendiente: c.autoPagoPendiente,
+    categoria_pendientes_slug: c.categoriaPendientesSlug,
+    sync_to_clients: c.syncToClients,
+    updated_at: toIso(c.updatedAt),
+  };
+}
+
+export function serializePago(
+  p: Pago & { personaNombre?: string; personaTelefono?: string; categoriaSlug?: string },
+) {
+  return withMongoShape({
+    id: p.id,
+    persona_id: p.personaId,
+    estado: p.estado,
+    monto: p.monto,
+    moneda: p.moneda,
+    concepto: p.concepto,
+    fecha_vencimiento: p.fechaVencimiento,
+    fecha_pago: p.fechaPago,
+    referencia: p.referencia,
+    notas: p.notas,
+    metadata: p.metadata,
+    persona_nombre: p.personaNombre ?? null,
+    persona_telefono: p.personaTelefono ?? null,
+    categoria_slug: p.categoriaSlug ?? null,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
   });
 }
 

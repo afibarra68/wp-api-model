@@ -9,6 +9,7 @@ type Row = {
   estado: Template['estado'];
   header_tipo: Template['headerTipo'];
   header_url: string | null;
+  header_text: string | null;
   cuerpo: string;
   variables: TemplateVariable[];
   created_at: Date;
@@ -24,6 +25,7 @@ function mapRow(r: Row): Template {
     estado: r.estado,
     headerTipo: r.header_tipo,
     headerUrl: r.header_url,
+    headerText: r.header_text,
     cuerpo: r.cuerpo,
     variables: r.variables ?? [],
     createdAt: r.created_at,
@@ -32,7 +34,7 @@ function mapRow(r: Row): Template {
 }
 
 const FIELDS =
-  'id, nombre_meta, idioma, categoria, estado, header_tipo, header_url, cuerpo, variables, created_at, updated_at';
+  'id, nombre_meta, idioma, categoria, estado, header_tipo, header_url, header_text, cuerpo, variables, created_at, updated_at';
 
 export async function countTemplates(): Promise<number> {
   const { rows } = await getPool().query<{ c: string }>('SELECT COUNT(*)::text AS c FROM templates');
@@ -57,18 +59,20 @@ export async function createTemplate(input: {
   categoria?: Template['categoria'];
   header_tipo?: Template['headerTipo'];
   header_url?: string | null;
+  header_text?: string | null;
   cuerpo: string;
   variables?: TemplateVariable[];
 }): Promise<Template> {
   const { rows } = await getPool().query<Row>(
-    `INSERT INTO templates (nombre_meta, idioma, categoria, header_tipo, header_url, cuerpo, variables)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING ${FIELDS}`,
+    `INSERT INTO templates (nombre_meta, idioma, categoria, header_tipo, header_url, header_text, cuerpo, variables)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING ${FIELDS}`,
     [
       input.nombre_meta,
       input.idioma ?? 'es',
       input.categoria ?? 'utility',
       input.header_tipo ?? 'none',
       input.header_url ?? null,
+      input.header_text ?? null,
       input.cuerpo,
       JSON.stringify(input.variables ?? []),
     ],
@@ -81,8 +85,8 @@ export async function createTemplatesBulk(
 ): Promise<void> {
   for (const t of items) {
     await getPool().query(
-      `INSERT INTO templates (nombre_meta, idioma, categoria, estado, header_tipo, header_url, cuerpo, variables)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      `INSERT INTO templates (nombre_meta, idioma, categoria, estado, header_tipo, header_url, header_text, cuerpo, variables)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [
         t.nombre_meta,
         t.idioma ?? 'es',
@@ -90,6 +94,7 @@ export async function createTemplatesBulk(
         t.estado ?? 'borrador',
         t.header_tipo ?? 'none',
         t.header_url ?? null,
+        t.header_text ?? null,
         t.cuerpo,
         JSON.stringify(t.variables ?? []),
       ],
@@ -105,6 +110,7 @@ export async function updateTemplate(
     categoria: Template['categoria'];
     header_tipo: Template['headerTipo'];
     header_url: string | null;
+    header_text: string | null;
     variables: TemplateVariable[];
   }>,
 ): Promise<Template | null> {
@@ -116,6 +122,7 @@ export async function updateTemplate(
   if (patch.categoria !== undefined) { sets.push(`categoria = $${i++}`); vals.push(patch.categoria); }
   if (patch.header_tipo !== undefined) { sets.push(`header_tipo = $${i++}`); vals.push(patch.header_tipo); }
   if (patch.header_url !== undefined) { sets.push(`header_url = $${i++}`); vals.push(patch.header_url); }
+  if (patch.header_text !== undefined) { sets.push(`header_text = $${i++}`); vals.push(patch.header_text); }
   if (patch.variables !== undefined) { sets.push(`variables = $${i++}`); vals.push(JSON.stringify(patch.variables)); }
   if (sets.length === 0) return findTemplateById(id);
   const { rows } = await getPool().query<Row>(

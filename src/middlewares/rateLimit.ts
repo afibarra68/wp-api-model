@@ -9,6 +9,15 @@ export const loginLimiter = rateLimit({
   message: { error: { code: 'RATE_LIMITED', message: 'Demasiados intentos, intenta más tarde' } },
 });
 
+/** Limita registros publicos. */
+export const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMITED', message: 'Demasiados registros, intenta más tarde' } },
+});
+
 /** Límite general para la API. */
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,

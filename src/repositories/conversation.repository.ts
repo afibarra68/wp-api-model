@@ -40,10 +40,44 @@ export async function findConversations(modo?: string): Promise<Conversation[]> 
     params.push(modo);
   }
   const { rows } = await getPool().query<ConvRow>(
-    `SELECT ${CONV_FIELDS} FROM conversations ${where} ORDER BY ultima_actividad DESC LIMIT 200`,
+    `SELECT ${CONV_FIELDS} FROM conversations ${where} ORDER BY ultima_actividad DESC NULLS LAST LIMIT 200`,
     params,
   );
   return rows.map(mapConv);
+}
+
+export async function findConversationsEnriched(modo?: string): Promise<
+  Array<Conversation & { clienteNombre: string | null; espera_respuesta: boolean }>
+> {
+  const params: unknown[] = [];
+  let where = '';
+  if (modo) {
+    where = 'WHERE c.modo = $1';
+    params.push(modo);
+  }
+  const { rows } = await getPool().query<
+    ConvRow & { cliente_nombre: string | null; ultimo_direction: string | null }
+  >(
+    `SELECT c.id, c.cliente_id, c.telefono, c.ventana_abierta_hasta, c.modo,
+            c.ultimo_mensaje_entrante, c.ultima_actividad, c.created_at, c.updated_at,
+            cl.nombre AS cliente_nombre,
+            (
+              SELECT direction FROM conversation_messages cm
+              WHERE cm.conversation_id = c.id
+              ORDER BY cm.created_at DESC LIMIT 1
+            ) AS ultimo_direction
+     FROM conversations c
+     LEFT JOIN clients cl ON cl.id = c.cliente_id
+     ${where}
+     ORDER BY c.ultima_actividad DESC NULLS LAST
+     LIMIT 200`,
+    params,
+  );
+  return rows.map((r) => ({
+    ...mapConv(r),
+    clienteNombre: r.cliente_nombre,
+    espera_respuesta: r.ultimo_direction === 'inbound',
+  }));
 }
 
 export async function findConversationById(id: string): Promise<Conversation | null> {
