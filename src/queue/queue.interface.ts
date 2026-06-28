@@ -3,10 +3,13 @@ export interface EmissionJob {
   campaignId: string;
   clientId: string;
   telefono: string;
-  templateId: string;
+  templateName: string;
+  languageCode: string;
+  templateCategory: 'marketing' | 'utility' | 'authentication';
   variables: string[];
-  /** Espera en ms antes de procesar este mensaje (dosificación por campaña). */
-  delayMs?: number;
+  headerImageUrl?: string | null;
+  productPolicy?: 'CLOUD_API_FALLBACK' | 'STRICT';
+  messageActivitySharing?: boolean;
 }
 
 export type JobProcessor = (job: EmissionJob) => Promise<void>;

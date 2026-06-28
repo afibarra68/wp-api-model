@@ -1,16 +1,11 @@
 import { toIso, withMongoShape } from '../core/apiShape';
 import type {
-  BotConfig,
   BotRule,
   Campaign,
+  CampaignSettings,
   Client,
   Conversation,
-  ConversationMessage,
   MessageLog,
-  Pago,
-  Persona,
-  PersonaCategoria,
-  PersonasConfig,
   Template,
   User,
 } from '../types/entities';
@@ -22,7 +17,6 @@ export function serializeUser(u: User) {
     email: u.email,
     rol: u.rol,
     activo: u.activo,
-    estado_aprobacion: u.estadoAprobacion,
     ultimo_login: u.ultimoLogin,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
@@ -54,9 +48,6 @@ export function serializeTemplate(t: Template) {
     estado: t.estado,
     header_tipo: t.headerTipo,
     header_url: t.headerUrl,
-    header_text: t.headerText,
-    footer: t.footer,
-    botones: t.botones,
     cuerpo: t.cuerpo,
     variables: t.variables,
     createdAt: t.createdAt,
@@ -74,26 +65,6 @@ export function serializeCampaign(c: Campaign) {
       solo_activos: c.segmento.soloActivos,
     },
     mapeo_variables: c.mapeoVariables,
-    config_envio: c.configEnvio
-      ? {
-          tope_diario: c.configEnvio.topeDiario,
-          dias_estimados: c.configEnvio.diasEstimados,
-          ventana_inicio: c.configEnvio.ventanaInicio,
-          enviados_en_ventana: c.configEnvio.enviadosEnVentana,
-          intervalo_min_seg: c.configEnvio.intervaloMinSeg ?? 1,
-          intervalo_max_seg: c.configEnvio.intervaloMaxSeg ?? 10,
-        }
-      : c.configPreferencias.topeDiario ||
-          c.configPreferencias.diasPlanificados ||
-          c.configPreferencias.intervaloMinSeg ||
-          c.configPreferencias.intervaloMaxSeg
-        ? {
-            tope_diario: c.configPreferencias.topeDiario ?? null,
-            dias_planificados: c.configPreferencias.diasPlanificados ?? null,
-            intervalo_min_seg: c.configPreferencias.intervaloMinSeg ?? 1,
-            intervalo_max_seg: c.configPreferencias.intervaloMaxSeg ?? 10,
-          }
-        : null,
     estado: c.estado,
     metricas: c.metricas,
     fecha_lanzamiento: c.fechaLanzamiento,
@@ -101,6 +72,16 @@ export function serializeCampaign(c: Campaign) {
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   });
+}
+
+export function serializeCampaignSettings(s: CampaignSettings) {
+  return {
+    send_rate_per_second: s.sendRatePerSecond,
+    release_batch_size: s.releaseBatchSize,
+    product_policy: s.productPolicy,
+    message_activity_sharing: s.messageActivitySharing,
+    updated_at: s.updatedAt,
+  };
 }
 
 export function serializeMessageLog(l: MessageLog) {
@@ -119,7 +100,7 @@ export function serializeMessageLog(l: MessageLog) {
   });
 }
 
-export function serializeConversation(c: Conversation, extra?: Record<string, unknown>) {
+export function serializeConversation(c: Conversation) {
   return withMongoShape({
     id: c.id,
     cliente_id: c.clienteId,
@@ -130,20 +111,6 @@ export function serializeConversation(c: Conversation, extra?: Record<string, un
     ultima_actividad: c.ultimaActividad,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
-    ...extra,
-  });
-}
-
-export function serializeConversationMessage(m: ConversationMessage) {
-  return withMongoShape({
-    id: m.id,
-    conversation_id: m.conversationId,
-    direction: m.direction,
-    origen: m.origen,
-    texto: m.texto,
-    whatsapp_message_id: m.whatsappMessageId,
-    estado: m.estado,
-    createdAt: m.createdAt,
   });
 }
 
@@ -161,14 +128,6 @@ export function serializeBotRule(r: BotRule) {
   });
 }
 
-export function serializeBotConfig(c: BotConfig) {
-  return {
-    mensaje_cierre: c.mensajeCierre,
-    enviar_mensaje_cierre: c.enviarMensajeCierre,
-    updated_at: toIso(c.updatedAt),
-  };
-}
-
 /** Cliente en forma plana para resolveVariables (campos snake_case). */
 export function clientForMapeo(c: Client): Record<string, unknown> {
   return {
@@ -178,68 +137,6 @@ export function clientForMapeo(c: Client): Record<string, unknown> {
     opt_in: c.optIn,
     metadata: c.metadata,
   };
-}
-
-export function serializePersonaCategoria(c: PersonaCategoria) {
-  return withMongoShape({
-    id: c.slug,
-    slug: c.slug,
-    nombre: c.nombre,
-    descripcion: c.descripcion,
-    color: c.color,
-    activo: c.activo,
-    orden: c.orden,
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-  });
-}
-
-export function serializePersona(p: Persona) {
-  return withMongoShape({
-    id: p.id,
-    nombre: p.nombre,
-    telefono: p.telefono,
-    categoria_slug: p.categoriaSlug,
-    activo: p.activo,
-    notas: p.notas,
-    metadata: p.metadata,
-    origen: p.origen,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-  });
-}
-
-export function serializePersonasConfig(c: PersonasConfig) {
-  return {
-    default_country_code: c.defaultCountryCode,
-    auto_pago_pendiente: c.autoPagoPendiente,
-    categoria_pendientes_slug: c.categoriaPendientesSlug,
-    sync_to_clients: c.syncToClients,
-    updated_at: toIso(c.updatedAt),
-  };
-}
-
-export function serializePago(
-  p: Pago & { personaNombre?: string; personaTelefono?: string; categoriaSlug?: string },
-) {
-  return withMongoShape({
-    id: p.id,
-    persona_id: p.personaId,
-    estado: p.estado,
-    monto: p.monto,
-    moneda: p.moneda,
-    concepto: p.concepto,
-    fecha_vencimiento: p.fechaVencimiento,
-    fecha_pago: p.fechaPago,
-    referencia: p.referencia,
-    notas: p.notas,
-    metadata: p.metadata,
-    persona_nombre: p.personaNombre ?? null,
-    persona_telefono: p.personaTelefono ?? null,
-    categoria_slug: p.categoriaSlug ?? null,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-  });
 }
 
 export { toIso };

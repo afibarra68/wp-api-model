@@ -97,11 +97,8 @@ CREATE TABLE IF NOT EXISTS templates (
     CHECK (categoria IN ('marketing', 'utility', 'authentication')),
   estado       TEXT NOT NULL DEFAULT 'borrador'
     CHECK (estado IN ('borrador', 'pendiente', 'aprobada', 'rechazada')),
-  header_tipo  TEXT NOT NULL DEFAULT 'none' CHECK (header_tipo IN ('none', 'image', 'text')),
+  header_tipo  TEXT NOT NULL DEFAULT 'none' CHECK (header_tipo IN ('none', 'image')),
   header_url   TEXT,
-  header_text  TEXT,
-  footer       TEXT,
-  botones      JSONB NOT NULL DEFAULT '[]',
   cuerpo       TEXT NOT NULL,
   variables    JSONB NOT NULL DEFAULT '[]',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -119,7 +116,6 @@ CREATE TABLE IF NOT EXISTS campaigns (
   estado              TEXT NOT NULL DEFAULT 'borrador'
     CHECK (estado IN ('borrador', 'en_progreso', 'pausada', 'finalizada', 'error')),
   metricas            JSONB NOT NULL DEFAULT '{"total":0,"encolados":0,"enviados":0,"entregados":0,"leidos":0,"fallidos":0}',
-  config_envio        JSONB NOT NULL DEFAULT '{}',
   fecha_lanzamiento   TIMESTAMPTZ,
   fecha_finalizacion  TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -127,6 +123,20 @@ CREATE TABLE IF NOT EXISTS campaigns (
 );
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_estado ON campaigns (estado);
+
+-- Configuración global de campañas (singleton id=1)
+CREATE TABLE IF NOT EXISTS campaign_settings (
+  id                              SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  send_rate_per_second            INT NOT NULL DEFAULT 2 CHECK (send_rate_per_second BETWEEN 1 AND 50),
+  release_batch_size              INT NOT NULL DEFAULT 20 CHECK (release_batch_size BETWEEN 1 AND 500),
+  product_policy                  TEXT CHECK (
+    product_policy IS NULL OR product_policy IN ('CLOUD_API_FALLBACK', 'STRICT')
+  ),
+  message_activity_sharing        BOOLEAN,
+  updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO campaign_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS message_logs (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,8 +148,8 @@ CREATE TABLE IF NOT EXISTS message_logs (
     meta_message_status IS NULL
     OR meta_message_status IN ('accepted', 'held_for_quality_assessment', 'paused')
   ),
-  estado_actual         TEXT NOT NULL DEFAULT 'pendiente'
-    CHECK (estado_actual IN ('pendiente', 'encolado', 'enviado', 'entregado', 'leido', 'fallido')),
+  estado_actual         TEXT NOT NULL DEFAULT 'encolado'
+    CHECK (estado_actual IN ('encolado', 'enviado', 'entregado', 'leido', 'fallido')),
   error                 TEXT,
   historial_estados     JSONB NOT NULL DEFAULT '[]',
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -164,21 +174,6 @@ CREATE TABLE IF NOT EXISTS conversations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_conversations_telefono ON conversations (telefono);
-
-CREATE TABLE IF NOT EXISTS conversation_messages (
-  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id      UUID NOT NULL REFERENCES conversations (id) ON DELETE CASCADE,
-  direction            TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
-  origen               TEXT NOT NULL CHECK (origen IN ('cliente', 'bot', 'agente', 'sistema')),
-  texto                TEXT NOT NULL,
-  whatsapp_message_id  TEXT,
-  estado               TEXT CHECK (estado IN ('enviado', 'entregado', 'leido', 'fallido')),
-  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_conv_messages_conversation ON conversation_messages (conversation_id, created_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_messages_wamid
-  ON conversation_messages (whatsapp_message_id) WHERE whatsapp_message_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS bot_rules (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

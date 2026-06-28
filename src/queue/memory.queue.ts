@@ -1,31 +1,38 @@
+import { env } from '../config/env';
 import { logger } from '../core/logger';
-import { sleep } from '../core/campaignInterval';
 import { EmissionJob, JobProcessor, MessageQueue } from './queue.interface';
 
 /**
- * Cola EN MEMORIA con dosificación por campaña (delayMs en cada job).
- * Ideal para desarrollo y pruebas locales.
+ * Cola EN MEMORIA con dosificación (sin Redis). Ideal para desarrollo y pruebas locales.
+ * Procesa SEND_RATE_PER_SECOND trabajos por segundo.
+ * Nota: no persiste; si el proceso muere, los trabajos pendientes se pierden.
  */
 export class MemoryQueue implements MessageQueue {
   readonly name = 'memory';
   private items: EmissionJob[] = [];
   private processor: JobProcessor | null = null;
   private paused = false;
-  private draining = false;
+  private timer: NodeJS.Timeout | null = null;
+  private readonly intervalMs: number;
+
+  constructor() {
+    const rate = Math.max(1, env.sendRatePerSecond);
+    this.intervalMs = Math.floor(1000 / rate);
+  }
 
   process(processor: JobProcessor): void {
     this.processor = processor;
-    this.ensureDrain();
+    this.ensureLoop();
   }
 
   async add(job: EmissionJob): Promise<void> {
     this.items.push(job);
-    this.ensureDrain();
+    this.ensureLoop();
   }
 
   async addBulk(jobs: EmissionJob[]): Promise<void> {
     this.items.push(...jobs);
-    this.ensureDrain();
+    this.ensureLoop();
   }
 
   async pause(): Promise<void> {
@@ -34,34 +41,28 @@ export class MemoryQueue implements MessageQueue {
 
   async resume(): Promise<void> {
     this.paused = false;
-    this.ensureDrain();
+    this.ensureLoop();
   }
 
   async close(): Promise<void> {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
     this.items = [];
-    this.draining = false;
   }
 
-  private ensureDrain(): void {
-    if (!this.draining) void this.drain();
+  private ensureLoop(): void {
+    if (this.timer) return;
+    this.timer = setInterval(() => void this.tick(), this.intervalMs);
   }
 
-  private async drain(): Promise<void> {
-    if (this.draining || this.paused || !this.processor) return;
-    this.draining = true;
+  private async tick(): Promise<void> {
+    if (this.paused || !this.processor) return;
+    const job = this.items.shift();
+    if (!job) return;
     try {
-      while (!this.paused && this.items.length > 0) {
-        const job = this.items.shift()!;
-        if (job.delayMs && job.delayMs > 0) await sleep(job.delayMs);
-        try {
-          await this.processor(job);
-        } catch (err) {
-          logger.error({ err, job }, 'Error procesando trabajo (memory queue)');
-        }
-      }
-    } finally {
-      this.draining = false;
-      if (!this.paused && this.items.length > 0) this.ensureDrain();
+      await this.processor(job);
+    } catch (err) {
+      logger.error({ err, job }, 'Error procesando trabajo (memory queue)');
     }
   }
 }

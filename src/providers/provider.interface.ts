@@ -7,12 +7,8 @@ export interface SendTemplateInput {
   templateName: string;
   languageCode: string;
   variables: string[];
-  /** URL pública de imagen para encabezado tipo IMAGE. */
+  /** URL pública de una imagen para el encabezado (banner) de la plantilla. Opcional. */
   headerImageUrl?: string | null;
-  /** Parámetros de texto para encabezado con variables {{1}}. */
-  headerTextVariables?: string[];
-  /** Parámetros dinámicos de botones URL (index + texto del sufijo). */
-  buttonUrlVariables?: Array<{ index: number; text: string }>;
   /** Categoría de la plantilla; marketing usa el endpoint /marketing_messages de Meta. */
   templateCategory?: TemplateCategory;
   /** Solo aplica en plantillas marketing. Ver docs de Meta Marketing Messages API. */

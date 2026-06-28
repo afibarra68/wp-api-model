@@ -7,12 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-whatsapp_control}
-    ports:
-      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
-      # Volumen nombrado fijo (wc-whatsapp-postgres-data): persiste al hacer docker compose down
       - postgres_data:/var/lib/postgresql/data
-      # Solo corre en el primer arranque (base vacía); no re-ejecuta si el volumen ya tiene datos
       - ./sql/setup.sql:/docker-entrypoint-initdb.d/01-setup.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-whatsapp_control}']
@@ -68,6 +64,4 @@ services:
 
 volumes:
   postgres_data:
-    name: wc-whatsapp-postgres-data
   redis_data:
-    name: wc-whatsapp-redis-data

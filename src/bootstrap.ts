@@ -4,7 +4,6 @@ import { connectPostgres } from './core/postgres';
 import { createApp } from './core/app';
 import { startDispatcher } from './queue/dispatcher';
 import { seedAdmin } from './seed/seedAdmin';
-import { seedHelloWorldTemplate } from './seed/seedHelloWorld';
 import { seedMockups } from './seed/seedMockups';
 import { loadIntegrationSettings } from './modules/integrations/integration.config';
 import { seedIntegrationFromEnv, syncIntegrationSecretsFromEnv } from './modules/integrations/integration.service';
@@ -21,7 +20,6 @@ export async function bootstrapApp(): Promise<Express> {
   await loadIntegrationSettings();
 
   await seedAdmin();
-  await seedHelloWorldTemplate();
   if (env.seedMockups) await seedMockups();
 
   if (env.queueDriver !== 'db') {

@@ -29,17 +29,8 @@ const passwordSchema = z.object({ password: z.string().min(8) });
 
 router.get(
   '/',
-  asyncHandler(async (req, res) => {
-    const { estado_aprobacion } = req.query as Record<string, string>;
-    const filter: userRepo.UserListFilter = {};
-    if (
-      estado_aprobacion === 'pendiente' ||
-      estado_aprobacion === 'aprobado' ||
-      estado_aprobacion === 'rechazado'
-    ) {
-      filter.estadoAprobacion = estado_aprobacion;
-    }
-    const users = await userRepo.findAllUsers(filter);
+  asyncHandler(async (_req, res) => {
+    const users = await userRepo.findAllUsers();
     res.json(users.map(serializeUser));
   }),
 );
@@ -56,8 +47,6 @@ router.post(
       email,
       rol,
       passwordHash: await hashPassword(password),
-      activo: true,
-      estadoAprobacion: 'aprobado',
     });
     res.status(201).json(serializeUser(user));
   }),
@@ -92,38 +81,6 @@ router.patch(
       passwordHash: await hashPassword(req.body.password),
     });
     res.json({ ok: true });
-  }),
-);
-
-router.post(
-  '/:id/aprobar',
-  asyncHandler(async (req, res) => {
-    const user = await userRepo.findUserById(req.params.id);
-    if (!user) throw AppError.notFound('Usuario no encontrado');
-    if (user.estadoAprobacion === 'aprobado' && user.activo) {
-      throw AppError.conflict('El usuario ya está aprobado');
-    }
-    const updated = await userRepo.updateUser(req.params.id, {
-      estadoAprobacion: 'aprobado',
-      activo: true,
-    });
-    res.json(serializeUser(updated!));
-  }),
-);
-
-router.post(
-  '/:id/rechazar',
-  asyncHandler(async (req, res) => {
-    const user = await userRepo.findUserById(req.params.id);
-    if (!user) throw AppError.notFound('Usuario no encontrado');
-    if (req.user?.id === req.params.id) {
-      throw AppError.badRequest('No puedes rechazar tu propio usuario');
-    }
-    const updated = await userRepo.updateUser(req.params.id, {
-      estadoAprobacion: 'rechazado',
-      activo: false,
-    });
-    res.json(serializeUser(updated!));
   }),
 );
 

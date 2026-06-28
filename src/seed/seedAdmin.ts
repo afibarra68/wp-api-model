@@ -15,8 +15,6 @@ export async function seedAdmin(): Promise<void> {
     email: env.seedAdminEmail.toLowerCase(),
     rol: 'admin',
     passwordHash: await hashPassword(env.seedAdminPassword),
-    activo: true,
-    estadoAprobacion: 'aprobado',
   });
   logger.info({ email: env.seedAdminEmail }, 'Seed: usuario admin base creado');
 }

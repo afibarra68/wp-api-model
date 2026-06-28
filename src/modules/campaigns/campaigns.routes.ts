@@ -4,7 +4,7 @@ import { asyncHandler } from '../../middlewares/asyncHandler';
 import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
 import { AppError } from '../../core/errors';
-import { serializeCampaign, serializeMessageLog } from '../../core/serializers';
+import { serializeCampaign, serializeCampaignSettings, serializeMessageLog } from '../../core/serializers';
 import * as campaignRepo from '../../repositories/campaign.repository';
 import * as messageLogRepo from '../../repositories/messageLog.repository';
 import * as svc from './campaigns.service';
@@ -29,14 +29,6 @@ const createSchema = z.object({
     })
     .default({ solo_activos: true }),
   mapeo_variables: z.array(mapeoSchema).default([]),
-  config_envio: z
-    .object({
-      tope_diario: z.number().int().positive().optional(),
-      dias_planificados: z.number().int().positive().optional(),
-      intervalo_min_seg: z.number().int().min(1).max(10).optional(),
-      intervalo_max_seg: z.number().int().min(1).max(10).optional(),
-    })
-    .optional(),
 });
 
 router.get(
@@ -58,6 +50,38 @@ router.post(
     res.status(201).json(serializeCampaign(campaign));
   }),
 );
+
+const settingsSchema = z.object({
+  send_rate_per_second: z.number().int().min(1).max(50).optional(),
+  release_batch_size: z.number().int().min(1).max(500).optional(),
+  product_policy: z.enum(['CLOUD_API_FALLBACK', 'STRICT']).nullable().optional(),
+  message_activity_sharing: z.boolean().nullable().optional(),
+});
+
+router.get(
+  '/settings',
+  requireRole('admin'),
+  asyncHandler(async (_req, res) => {
+    res.json(serializeCampaignSettings(await svc.getCampaignSettings()));
+  }),
+);
+
+router.patch(
+  '/settings',
+  requireRole('admin'),
+  validateBody(settingsSchema),
+  asyncHandler(async (req, res) => {
+    res.json(serializeCampaignSettings(await svc.updateCampaignSettings(req.body)));
+  }),
+);
+
+const testSendSchema = z.object({
+  telefono: z.string().min(8),
+});
+
+const releaseSchema = z.object({
+  batch_size: z.number().int().min(1).max(500).optional(),
+});
 
 router.get(
   '/:id',
@@ -99,12 +123,19 @@ router.post(
   }),
 );
 
-router.delete(
-  '/:id',
+router.post(
+  '/:id/release',
+  validateBody(releaseSchema),
   asyncHandler(async (req, res) => {
-    if (!svc.isValidId(req.params.id)) throw AppError.badRequest('ID inválido');
-    await svc.deleteCampaign(req.params.id);
-    res.json({ ok: true });
+    res.json(await svc.releasePendingMessages(req.params.id, req.body.batch_size));
+  }),
+);
+
+router.post(
+  '/:id/test-send',
+  validateBody(testSendSchema),
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.testSendCampaign(req.params.id, req.body.telefono));
   }),
 );
 

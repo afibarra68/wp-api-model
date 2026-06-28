@@ -1,5 +1,4 @@
 export const ESTADOS_MENSAJE = [
-  'pendiente',
   'encolado',
   'enviado',
   'entregado',
@@ -10,7 +9,6 @@ export const ESTADOS_MENSAJE = [
 export type EstadoMensaje = (typeof ESTADOS_MENSAJE)[number];
 
 export const ORDEN_ESTADO: Record<EstadoMensaje, number> = {
-  pendiente: -1,
   encolado: 0,
   enviado: 1,
   entregado: 2,
@@ -20,8 +18,6 @@ export const ORDEN_ESTADO: Record<EstadoMensaje, number> = {
 
 export type Role = 'admin' | 'operador' | 'agente';
 
-export type UserApprovalStatus = 'pendiente' | 'aprobado' | 'rechazado';
-
 export interface User {
   id: string;
   nombre: string;
@@ -29,9 +25,6 @@ export interface User {
   passwordHash?: string;
   rol: Role;
   activo: boolean;
-  estadoAprobacion: UserApprovalStatus;
-  mfaEnabled: boolean;
-  totpSecret?: string | null;
   ultimoLogin: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -57,25 +50,14 @@ export interface TemplateVariable {
   ejemplo?: string;
 }
 
-/** Botón de plantilla Meta (quick reply, URL o teléfono). */
-export interface TemplateButton {
-  tipo: 'quick_reply' | 'url' | 'phone';
-  texto: string;
-  url?: string | null;
-  telefono?: string | null;
-}
-
 export interface Template {
   id: string;
   nombreMeta: string;
   idioma: string;
   categoria: 'marketing' | 'utility' | 'authentication';
   estado: 'borrador' | 'pendiente' | 'aprobada' | 'rechazada';
-  headerTipo: 'none' | 'image' | 'text';
+  headerTipo: 'none' | 'image';
   headerUrl: string | null;
-  headerText: string | null;
-  footer: string | null;
-  botones: TemplateButton[];
   cuerpo: string;
   variables: TemplateVariable[];
   createdAt: Date;
@@ -100,24 +82,14 @@ export interface CampaignMetricas {
   entregados: number;
   leidos: number;
   fallidos: number;
-  pendientes?: number;
 }
 
-/** Dosificación diaria: tope por ventana de 24 h desde ventana_inicio. */
-export interface CampaignConfigEnvio {
-  topeDiario: number;
-  diasEstimados: number;
-  ventanaInicio: Date | null;
-  enviadosEnVentana: number;
-  intervaloMinSeg?: number;
-  intervaloMaxSeg?: number;
-}
-
-export interface CampaignPlanEnvio {
-  topeDiario: number;
-  diasEstimados: number;
-  total: number;
-  mensajesUltimoDia: number;
+export interface CampaignSettings {
+  sendRatePerSecond: number;
+  releaseBatchSize: number;
+  productPolicy: 'CLOUD_API_FALLBACK' | 'STRICT' | null;
+  messageActivitySharing: boolean | null;
+  updatedAt: Date;
 }
 
 export interface Campaign {
@@ -127,13 +99,6 @@ export interface Campaign {
   integrationId: string | null;
   segmento: CampaignSegmento;
   mapeoVariables: CampaignMapeo[];
-  configEnvio: CampaignConfigEnvio | null;
-  configPreferencias: {
-    topeDiario?: number;
-    diasPlanificados?: number;
-    intervaloMinSeg?: number;
-    intervaloMaxSeg?: number;
-  };
   estado: 'borrador' | 'en_progreso' | 'pausada' | 'finalizada' | 'error';
   metricas: CampaignMetricas;
   fechaLanzamiento: Date | null;
@@ -173,19 +138,6 @@ export interface Conversation {
   updatedAt: Date;
 }
 
-export type ConversationMessageOrigen = 'cliente' | 'bot' | 'agente' | 'sistema';
-
-export interface ConversationMessage {
-  id: string;
-  conversationId: string;
-  direction: 'inbound' | 'outbound';
-  origen: ConversationMessageOrigen;
-  texto: string;
-  whatsappMessageId: string | null;
-  estado: 'enviado' | 'entregado' | 'leido' | 'fallido' | null;
-  createdAt: Date;
-}
-
 export interface BotRule {
   id: string;
   nombre: string;
@@ -195,63 +147,5 @@ export interface BotRule {
   activo: boolean;
   prioridad: number;
   createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface BotConfig {
-  id: string;
-  mensajeCierre: string;
-  enviarMensajeCierre: boolean;
-  updatedAt: Date;
-}
-
-export interface PersonaCategoria {
-  slug: string;
-  nombre: string;
-  descripcion: string | null;
-  color: string | null;
-  activo: boolean;
-  orden: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Persona {
-  id: string;
-  nombre: string;
-  telefono: string;
-  categoriaSlug: string;
-  activo: boolean;
-  notas: string | null;
-  metadata: Record<string, unknown>;
-  origen: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export type PagoEstado = 'pendiente' | 'pagado' | 'cancelado';
-
-export interface Pago {
-  id: string;
-  personaId: string;
-  estado: PagoEstado;
-  monto: number | null;
-  moneda: string;
-  concepto: string | null;
-  fechaVencimiento: Date | null;
-  fechaPago: Date | null;
-  referencia: string | null;
-  notas: string | null;
-  metadata: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface PersonasConfig {
-  id: string;
-  defaultCountryCode: string;
-  autoPagoPendiente: boolean;
-  categoriaPendientesSlug: string;
-  syncToClients: boolean;
   updatedAt: Date;
 }

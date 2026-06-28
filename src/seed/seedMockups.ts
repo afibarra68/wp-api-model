@@ -1,8 +1,11 @@
 import { logger } from '../core/logger';
+import * as clientRepo from '../repositories/client.repository';
 import * as templateRepo from '../repositories/template.repository';
 import * as convRepo from '../repositories/conversation.repository';
 
-/** Plantillas y reglas bot opcionales (SEED_MOCKUPS=true). No crea clientes. */
+const CIUDADES = ['Cali', 'Bogotá', 'Medellín', 'Barranquilla'];
+const SEGMENTOS = ['premium', 'frecuente', 'nuevo'];
+
 export async function seedMockups(): Promise<void> {
   if ((await templateRepo.countTemplates()) === 0) {
     await templateRepo.createTemplatesBulk([
@@ -23,10 +26,36 @@ export async function seedMockups(): Promise<void> {
         categoria: 'marketing',
         estado: 'aprobada',
         cuerpo: 'Hola {{1}}, tenemos ofertas exclusivas para ti este mes.',
-        variables: [{ indice: 1, nombre: 'nombre', ejemplo: 'Maria' }],
+        variables: [{ indice: 1, nombre: 'nombre', ejemplo: 'María' }],
+      },
+      {
+        nombre_meta: 'gracias_participacion',
+        idioma: 'es',
+        categoria: 'marketing',
+        estado: 'aprobada',
+        header_tipo: 'image',
+        header_url: 'https://placehold.co/1080x540/25d366/06281a/png?text=Gracias+por+participar',
+        cuerpo:
+          'Gracias por participar {{1}}. A continuación encontrarás el detalle del evento. ¡Dios te bendiga!',
+        variables: [{ indice: 1, nombre: 'nombre', ejemplo: 'Hermano Juan' }],
       },
     ]);
     logger.info('Seed: plantillas de prueba creadas');
+  }
+
+  if ((await clientRepo.countAllClients()) === 0) {
+    const clientes = Array.from({ length: 20 }).map((_, i) => {
+      const n = i + 1;
+      return {
+        nombre: `Cliente ${n}`,
+        telefono: `5730010${String(n).padStart(5, '0')}`,
+        opt_in: n % 11 !== 0,
+        etiquetas: [CIUDADES[i % CIUDADES.length].toLowerCase(), SEGMENTOS[i % SEGMENTOS.length]],
+        metadata: { ciudad: CIUDADES[i % CIUDADES.length], segmento: SEGMENTOS[i % SEGMENTOS.length] },
+      };
+    });
+    await clientRepo.bulkUpsertClients(clientes);
+    logger.info('Seed: 20 clientes de prueba creados');
   }
 
   if ((await convRepo.countBotRules()) === 0) {
@@ -34,14 +63,14 @@ export async function seedMockups(): Promise<void> {
       {
         nombre: 'precios',
         palabras_clave: ['precio', 'tarifa', 'costo'],
-        respuesta: 'Nuestras tarifas inician desde $50.000. ¿Quieres mas detalles?',
+        respuesta: 'Nuestras tarifas inician desde $50.000. ¿Quieres más detalles?',
         prioridad: 10,
       },
       {
         nombre: 'saludo',
         palabras_clave: ['hola', 'buenas', 'info'],
         respuesta:
-          'Hola! Gracias por escribirnos. Escribe "precio" para ver tarifas o "asesor" para hablar con una persona.',
+          '¡Hola! Gracias por escribirnos. Escribe "precio" para ver tarifas o "asesor" para hablar con una persona.',
         prioridad: 1,
       },
     ]);
