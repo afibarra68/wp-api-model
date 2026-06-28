@@ -4,7 +4,7 @@ import * as clientRepo from '../repositories/client.repository';
 import * as templateRepo from '../repositories/template.repository';
 import * as messageLogRepo from '../repositories/messageLog.repository';
 import { getProvider } from '../providers';
-import { resolveVariables } from '../modules/campaigns/campaigns.service';
+import { variablesForTemplate } from '../modules/campaigns/campaigns.service';
 import { EmissionJob } from './queue.interface';
 
 export async function processEmissionJob(job: EmissionJob): Promise<void> {
@@ -54,7 +54,7 @@ export async function buildJobFromLog(log: {
     templateName: template.nombreMeta,
     languageCode: template.idioma,
     templateCategory: template.categoria,
-    variables: resolveVariables(client, campaign.mapeoVariables),
+    variables: variablesForTemplate(template.cuerpo, campaign.mapeoVariables, client),
     headerImageUrl: template.headerTipo === 'image' ? template.headerUrl : null,
   };
 }

@@ -5,6 +5,7 @@ import { validateBody } from '../../middlewares/validate';
 import { authJwt, requireRole } from '../../middlewares/auth';
 import { AppError } from '../../core/errors';
 import { serializeTemplate } from '../../core/serializers';
+import { parseTemplateVariables } from '../../core/templateVariables';
 import * as templateRepo from '../../repositories/template.repository';
 
 const router = Router();
@@ -16,6 +17,18 @@ const variableSchema = z.object({
   nombre: z.string().min(1),
   ejemplo: z.string().optional(),
 });
+
+function mergeVariableNames(
+  parsed: ReturnType<typeof parseTemplateVariables>,
+  provided?: z.infer<typeof variableSchema>[],
+) {
+  if (!provided?.length) return parsed;
+  const byIndex = new Map(provided.map((v) => [v.indice, v]));
+  return parsed.map((v) => {
+    const custom = byIndex.get(v.indice);
+    return custom ? { ...v, nombre: custom.nombre, ejemplo: custom.ejemplo } : v;
+  });
+}
 
 const createSchema = z.object({
   nombre_meta: z.string().min(1),
@@ -48,7 +61,11 @@ router.post(
   '/',
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
-    const template = await templateRepo.createTemplate(req.body);
+    const variables = mergeVariableNames(
+      parseTemplateVariables(req.body.cuerpo),
+      req.body.variables,
+    );
+    const template = await templateRepo.createTemplate({ ...req.body, variables });
     res.status(201).json(serializeTemplate(template));
   }),
 );
@@ -66,7 +83,18 @@ router.patch(
   '/:id',
   validateBody(updateSchema),
   asyncHandler(async (req, res) => {
-    const template = await templateRepo.updateTemplate(req.params.id, req.body);
+    const patch = { ...req.body };
+    if (req.body.cuerpo !== undefined) {
+      patch.variables = mergeVariableNames(
+        parseTemplateVariables(req.body.cuerpo),
+        req.body.variables,
+      );
+    } else if (req.body.variables !== undefined) {
+      const current = await templateRepo.findTemplateById(req.params.id);
+      if (!current) throw AppError.notFound('Plantilla no encontrada');
+      patch.variables = mergeVariableNames(parseTemplateVariables(current.cuerpo), req.body.variables);
+    }
+    const template = await templateRepo.updateTemplate(req.params.id, patch);
     if (!template) throw AppError.notFound('Plantilla no encontrada');
     res.json(serializeTemplate(template));
   }),

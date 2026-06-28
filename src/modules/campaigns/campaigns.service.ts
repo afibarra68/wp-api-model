@@ -9,6 +9,7 @@ import * as templateRepo from '../../repositories/template.repository';
 import * as messageLogRepo from '../../repositories/messageLog.repository';
 import { getQueue, EmissionJob } from '../../queue';
 import { buildJobFromLog, processEmissionJob } from '../../queue/emission.processor';
+import { parseTemplateVariables } from '../../core/templateVariables';
 import { getProvider } from '../../providers';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +27,7 @@ function buildSegmentFilter(segmento: CampaignSegmento | null | undefined) {
 }
 
 export function resolveVariables(client: Client, mapeo: CampaignMapeo[]): string[] {
+  if (mapeo.length === 0) return [];
   const flat = clientForMapeo(client);
   return [...mapeo]
     .sort((a, b) => a.indice - b.indice)
@@ -40,6 +42,18 @@ export function resolveVariables(client: Client, mapeo: CampaignMapeo[]): string
     });
 }
 
+export function variablesForTemplate(cuerpo: string, mapeo: CampaignMapeo[], client?: Client | null): string[] {
+  const count = parseTemplateVariables(cuerpo).length;
+  if (count === 0) return [];
+  if (!client) {
+    return mapeo
+      .filter((m) => m.origen === 'fijo')
+      .sort((a, b) => a.indice - b.indice)
+      .map((m) => m.valor);
+  }
+  return resolveVariables(client, mapeo);
+}
+
 export async function previewCampaign(campaignId: string) {
   const campaign = await campaignRepo.findCampaignById(campaignId);
   if (!campaign) throw AppError.notFound('Campaña no encontrada');
@@ -52,12 +66,14 @@ export async function previewCampaign(campaignId: string) {
 
   let ejemplo: { variables: string[]; texto: string } | null = null;
   if (sample) {
-    const variables = resolveVariables(sample, campaign.mapeoVariables);
+    const variables = variablesForTemplate(template.cuerpo, campaign.mapeoVariables, sample);
     let texto = template.cuerpo;
     variables.forEach((v, i) => {
       texto = texto.replace(new RegExp(`\\{\\{${i + 1}\\}\\}`, 'g'), v);
     });
     ejemplo = { variables, texto };
+  } else if (parseTemplateVariables(template.cuerpo).length === 0) {
+    ejemplo = { variables: [], texto: template.cuerpo };
   }
 
   return {
@@ -106,7 +122,7 @@ export async function launchCampaign(campaignId: string) {
     templateName: template.nombreMeta,
     languageCode: template.idioma,
     templateCategory: template.categoria,
-    variables: resolveVariables(c, campaign.mapeoVariables),
+    variables: variablesForTemplate(template.cuerpo, campaign.mapeoVariables, c),
     headerImageUrl: template.headerTipo === 'image' ? template.headerUrl : null,
     productPolicy: settings.productPolicy ?? undefined,
     messageActivitySharing: settings.messageActivitySharing ?? undefined,
@@ -226,12 +242,7 @@ export async function testSendCampaign(campaignId: string, telefono: string) {
   const client = await clientRepo.findClientByTelefono(normalized);
   const settings = await campaignSettingsRepo.getCampaignSettings();
 
-  const variables = client
-    ? resolveVariables(client, campaign.mapeoVariables)
-    : campaign.mapeoVariables
-        .filter((m) => m.origen === 'fijo')
-        .sort((a, b) => a.indice - b.indice)
-        .map((m) => m.valor);
+  const variables = variablesForTemplate(template.cuerpo, campaign.mapeoVariables, client);
 
   const result = await getProvider().sendTemplate({
     to: normalized,
