@@ -80,7 +80,7 @@ export function serializeCampaignSettings(s: CampaignSettings) {
     release_batch_size: s.releaseBatchSize,
     product_policy: s.productPolicy,
     message_activity_sharing: s.messageActivitySharing,
-    updated_at: s.updatedAt,
+    updated_at: toIso(s.updatedAt),
   };
 }
 

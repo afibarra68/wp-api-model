@@ -178,10 +178,14 @@ export async function findQueuedLogsByCampaign(campaignId: string, limit: number
 }
 
 export async function countHeldLogs(campaignId: string): Promise<number> {
-  const { rows } = await getPool().query<{ c: string }>(
-    `SELECT COUNT(*)::text AS c FROM message_logs
-     WHERE campana_id = $1 AND meta_message_status IN ('held_for_quality_assessment', 'paused')`,
-    [campaignId],
-  );
-  return Number(rows[0]?.c ?? 0);
+  try {
+    const { rows } = await getPool().query<{ c: string }>(
+      `SELECT COUNT(*)::text AS c FROM message_logs
+       WHERE campana_id = $1 AND meta_message_status IN ('held_for_quality_assessment', 'paused')`,
+      [campaignId],
+    );
+    return Number(rows[0]?.c ?? 0);
+  } catch {
+    return 0;
+  }
 }
